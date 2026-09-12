@@ -1,0 +1,33 @@
+# Godot 4
+.godot/
+/android/
+
+# Every other dot-* addon is a separate repository. For local development they are
+# symlinked; a consumer copies the ones it wants instead:
+#   ln -s ../../dot-core/addons/dot_core addons/dot_core
+#
+# These links must stay ignored. A committed symlink is checked out as a text
+# FILE by Git on Windows without Developer Mode, so Godot finds a 30-byte file
+# where an addon should be and every class_name in it fails to resolve.
+#
+# dot_moderation, dot_chat and dot_auth are OPTIONAL. Every bridge to them is
+# duck-typed and no DotPunishment*/DotChat*/DotAuth* identifier appears in this
+# addon; they are linked so the self-test runs against the real thing.
+/addons/dot_core
+/addons/dot_server
+/addons/dot_moderation
+/addons/dot_chat
+/addons/dot_auth
+
+# Exports
+build/
+export_presets.cfg
+
+# Operator data: rules an operator tuned, and what the guard did.
+/cfg/
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

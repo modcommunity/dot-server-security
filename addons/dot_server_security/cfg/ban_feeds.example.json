@@ -1,0 +1,54 @@
+{
+  "_comment": [
+    "Copy to user://cfg/ban_feeds.json. Any number of feeds; each has its own",
+    "credential, refresh rate and failure policy.",
+    "",
+    "NEVER put a token in this file if the file is in version control. Use",
+    "token_file, which is read at boot. The environment and the command line",
+    "are refused for credentials on purpose: both are readable by other",
+    "processes and both end up in `ps` output and in pasted bug reports."
+  ],
+
+  "feeds": [
+    {
+      "id": "public",
+      "url": "https://blocklist.example.org/bans.json",
+      "auth": "none",
+      "refresh_sec": 900,
+      "on_failure": "keep_last",
+      "cache_path": "user://cache/banfeed_public.json"
+    },
+
+    {
+      "id": "network",
+      "url": "https://bans.example.net/api/v1/active",
+      "auth": "bearer",
+      "token_file": "user://cfg/network.token",
+      "list_path": "data.bans",
+      "uid_fields": ["account_id", "uid"],
+      "address_fields": ["ip"],
+      "expires_fields": ["expires_at"],
+      "refresh_sec": 300,
+      "on_failure": "keep_last"
+    },
+
+    {
+      "id": "partner",
+      "url": "https://partner.example.com/blocklist",
+      "auth": "header",
+      "header_name": "X-Api-Key",
+      "token_file": "user://cfg/partner.key",
+      "refresh_sec": 3600,
+      "on_failure": "ignore"
+    },
+
+    {
+      "id": "signed",
+      "url": "https://internal.example/bans",
+      "auth": "hmac",
+      "token_file": "user://cfg/hmac.secret",
+      "refresh_sec": 120,
+      "on_failure": "refuse_all"
+    }
+  ]
+}

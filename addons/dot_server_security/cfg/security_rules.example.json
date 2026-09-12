@@ -1,0 +1,82 @@
+{
+  "_comment": [
+    "Copy this to user://cfg/security_rules.json and edit it, or run sec_dump",
+    "to write out the rules actually in force and start from those.",
+    "",
+    "A rule naming a shipped id REPLACES it whole rather than merging into it,",
+    "so what you see here is what runs. `disable` turns a shipped rule off",
+    "without restating it, and `replace_defaults` throws all of them away.",
+    "",
+    "sec_reload rereads this file, so tuning does not need a restart."
+  ],
+
+  "replace_defaults": false,
+
+  "disable": ["chat_shouting"],
+
+  "rules": [
+    {
+      "id": "chat_flood",
+      "event": "chat.message",
+      "enabled": true,
+      "threshold": 6,
+      "window_sec": 10,
+      "scope": "uid",
+      "cooldown_sec": 15,
+      "offence_memory_sec": 3600,
+      "exempt_flags": ["generic"],
+      "reason": "Sending messages too quickly ({count} in {window}s)",
+      "steps": [
+        {"action": "warn", "message": "Slow down, please."},
+        {"action": "gag", "duration_sec": 300},
+        {"action": "gag", "duration_sec": 1800},
+        {"action": "kick"}
+      ]
+    },
+
+    {
+      "id": "chat_links",
+      "event": "chat.link",
+      "enabled": true,
+      "threshold": 2,
+      "window_sec": 60,
+      "scope": "uid",
+      "cooldown_sec": 60,
+      "grace_sec": 0,
+      "reason": "Advertising ({count} links in {window}s)",
+      "steps": [
+        {"action": "warn"},
+        {"action": "gag", "duration_sec": 3600},
+        {"action": "ban", "duration_sec": 86400}
+      ]
+    },
+
+    {
+      "id": "rcon_bruteforce",
+      "event": "rcon.auth_failed",
+      "enabled": true,
+      "threshold": 3,
+      "window_sec": 300,
+      "scope": "address",
+      "cooldown_sec": 60,
+      "offence_memory_sec": 604800,
+      "exempt_flags": [],
+      "reason": "Wrong RCON password {count} times in {window}s",
+      "steps": [
+        {"action": "ban", "duration_sec": 3600},
+        {"action": "ban", "duration_sec": 0}
+      ]
+    },
+
+    {
+      "id": "own_game_event",
+      "event": "arena.buy_menu_spam",
+      "enabled": false,
+      "threshold": 30,
+      "window_sec": 10,
+      "scope": "uid",
+      "action": "warn",
+      "reason": "A rule over an event this game reports itself"
+    }
+  ]
+}
