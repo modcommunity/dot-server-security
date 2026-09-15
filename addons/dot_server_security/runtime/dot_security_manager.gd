@@ -51,6 +51,10 @@ signal acted(subject: String, action: int, duration_sec: int, rule_id: StringNam
 var server: DotServer = null
 
 ## Whatever registered as `dot_moderation`, or null. Duck-typed; never named.
+##
+## [b]Read through [method moderation_store] rather than directly.[/b] This is the cached
+## answer and it is allowed to be stale on purpose; see that method for why a value latched
+## at [method attach] is the wrong one on almost every server in this family.
 var moderation: Object = null
 
 var ledger: DotSecurityLedger = null
@@ -173,19 +177,50 @@ func attach() -> DotResult:
 		{
 			"rules": policy.enabled_rules().size(),
 			"dry_run": is_dry_run(),
-			"moderation": moderation != null,
+			"moderation": moderation_store() != null,
 		}
 	)
 
 	if moderation == null:
 		# Named once, at boot, because the difference is invisible afterwards: a
 		# gag still happens, it just does not survive the player reconnecting.
+		#
+		# "not yet", rather than "none": a game's module publishes the store and is
+		# loaded after the server boots, so this is the ordinary case on a server that
+		# ends up with a perfectly good store a second later. `sec_status` is the answer
+		# to what is actually in force -- it asks again.
 		DotLog.info(
 			CHANNEL,
-			"no moderation store: punishments last only as long as the connection"
+			"no moderation store yet: until one registers, punishments last only as "
+			+ "long as the connection. sec_status says what is in force now"
 		)
 
 	return DotResult.success(self)
+
+
+## The durable punishment store, looked up again if it was not there at [method attach].
+##
+## [b]The guard almost always starts before the store exists, and latching the answer meant
+## it never found one.[/b] A [DotSecurityManager] is placed beside a [DotServer] and
+## attaches as the server boots; dot-moderation's manager is built by the GAME, in a module
+## that dot-server loads afterwards — so `DotRegistry.get_service(&"dot_moderation")` at
+## attach time is null on every server in this family that has a moderation store at all.
+## What follows is silent and severe in exactly the way this addon exists to prevent: every
+## gag, mute and ban the guard issues falls back to the session, the punishment dies with
+## the connection, and the person it was issued against reconnects and carries on. Nothing
+## errors, because a server with no store is a supported configuration and reports itself
+## as one.
+##
+## Looked up **again** rather than **every time**: the registry lookup is a dictionary
+## read, but it happens on the path where somebody is being punished, and once found the
+## answer does not change for the life of the server. A game change frees the old store and
+## builds a new one, so the cached value is dropped when it stops being valid.
+func moderation_store() -> Object:
+	if moderation != null and is_instance_valid(moderation):
+		return moderation
+
+	moderation = DotRegistry.get_service(&"dot_moderation")
+	return moderation
 
 
 ## Rebuilds the event index. Call after changing the policy at runtime.
@@ -377,7 +412,7 @@ func _act(
 			step.duration_sec,
 			reason,
 			"security:%s" % rule.id,
-			moderation,
+			moderation_store(),
 			server,
 			event.session
 		)
@@ -591,7 +626,7 @@ func describe() -> Dictionary:
 		"rules": policy.rules.size() if policy != null else 0,
 		"active_rules": policy.enabled_rules().size() if policy != null else 0,
 		"events_seen": _events_seen,
-		"moderation": moderation != null,
+		"moderation": moderation_store() != null,
 		"tripped": ledger.total() if ledger != null else 0,
 		"applied": ledger.applied_count() if ledger != null else 0,
 	}
@@ -612,7 +647,7 @@ func describe_lines() -> PackedStringArray:
 		policy.enabled_rules().size(), policy.rules.size()
 	])
 	out.append("store       %s" % (
-		"dot-moderation (durable)" if moderation != null
+		"dot-moderation (durable)" if moderation_store() != null
 			else "session only (lost on reconnect)"
 	))
 	out.append("seen        %d events" % _events_seen)

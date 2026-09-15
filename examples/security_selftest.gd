@@ -1038,6 +1038,23 @@ func _test_without_moderation() -> void:
 	_check("and dot-moderation holds the record",
 		mod.call("is_gagged_key", "uid:durable-test"))
 
+	# [b]The guard almost always attaches BEFORE the store exists, and it used to latch
+	# the answer.[/b] A [DotSecurityManager] is placed beside a [DotServer] and attaches as
+	# the server boots; dot-moderation's manager is built by the GAME, in a module
+	# dot-server loads afterwards — so the registry lookup at attach time is null on every
+	# server in this family that has a store at all, and every punishment the guard issued
+	# from then on quietly died with the connection.
+	#
+	# Asserted by taking the cached answer away rather than by re-attaching, because what
+	# broke was the latch and not the lookup.
+	guard.moderation = null
+	_check("the store is found again when it was not there at attach",
+		guard.moderation_store() == mod)
+	_check("and the guard reports the one that is actually in force",
+		bool(guard.describe()["moderation"]))
+	_check("which is what sec_status says too",
+		_run("sec_status").contains("durable"))
+
 
 # --- The operator's surface ------------------------------------------------
 

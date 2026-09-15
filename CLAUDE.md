@@ -124,6 +124,29 @@ Other decisions worth not undoing:
 - **CIDR ranges are matched, not expanded.** A `/16` is sixty-five thousand entries for one line of somebody's list. IPv6 is a text-prefix match and says so — full v6 arithmetic in GDScript is a lot of code for something almost no blocklist publishes.
 - **Credentials come from `token_file`**, because `DotConfig` refuses secrets from the environment and argv for reasons that apply here exactly.
 
+## The guard latched the moderation store at boot, and therefore never found one
+
+`attach()` read `DotRegistry.get_service(&"dot_moderation")` once and kept the answer. On every server in this family that has a store at all, that answer is **null**.
+
+The ordering is not unusual, it is the only ordering there is. A `DotSecurityManager` is placed beside a `DotServer` and attaches as the server boots. dot-moderation's manager is built by the **game** — `ArenaServices`, `HungryServices`, `RoomServices`, each inside a module dot-server loads *after* the listener is open. So the registry lookup at attach time ran before the store existed, every time, and the guard spent the rest of the process believing there was none.
+
+What that costs is the whole durable half of this addon. `DotSecurityAction.apply` falls back to the session when it is handed no store — deliberately, so a deployment without dot-moderation still gets a gag the player feels — so every automatic punishment the guard issued died with the connection and the person it was issued against reconnected and carried on. **Nothing errors and nothing looks wrong**: a server with no store is a supported configuration, `sec_status` said "session only (lost on reconnect)", and that line is indistinguishable from the truth on a server that genuinely has no store.
+
+`moderation_store()` is the fix: the cached answer when there is one, another registry lookup when there is not. Looked up *again* rather than *every time* — the lookup is a dictionary read, but it happens on the path where somebody is being punished, and once found the answer does not change for the life of the server. `is_instance_valid` covers the game change that frees the old store and builds a new one.
+
+Two smaller things went with it:
+
+- **`describe()` and `sec_status` ask again too.** They were reading the latched field, so the operator's own view of what was in force agreed with the bug rather than with the server.
+- **The boot line says "not yet".** It used to say "no moderation store", which on the ordinary server is wrong about a second later. It now names `sec_status` as the thing that answers what is in force now.
+
+The suite asserts it by taking the cached answer away rather than by re-attaching, because what broke was the latch and not the lookup.
+
+## `cfg/security.yml` exists in dot-server-deploy now
+
+This addon was in that project's `ADDONS` list, linked into its `addons/`, compiled against by every game it vendors — and **never constructed**. A guard nobody builds watches nothing, and there is no symptom: the addon is present, the class resolves, and an operator reading the dependency list concludes their server is guarded.
+
+`TmcHost._build_security()` builds the manager, one `DotSecurityWatch` and the detectors for every server that tool runs, and `./server check` now fails if `sec_status` or `sec_why` is missing from the console of a server that actually booted — because an absent command is invisible until an admin types it during an incident.
+
 ## Validating changes
 
 ```bash
@@ -133,7 +156,7 @@ find . -name '*.gd' -not -path './.godot/*' | while read f; do
 done
 
 # 188 checks. Exits non-zero on any failure.
-godot --headless --path . res://examples/security_selftest.tscn
+godot --headless --path . res://examples/security_selftest.tscn   # 191 checks
 ```
 
 The suite runs against the **real** dot-moderation rather than a mock — the durable half of every action goes through it, and a suite that stubbed it would be asserting against its own idea of that addon.
