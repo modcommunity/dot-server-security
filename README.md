@@ -152,3 +152,7 @@ godot --headless --path . res://examples/security_selftest.tscn
 ```
 
 188 checks: the sliding window and its memory bound, escalation and cooldowns, exemptions, dry run, rules from JSON, the chat detectors, CIDR matching, every feed format and every auth mode, ban-source chaining, the anti-cheat split, and the fallback with no moderation store. The couplings to addons this one must not name — dot-moderation's subject prefixes and punishment kinds, dot-server's refusal wording — are asserted against the real addons rather than trusted to a comment, because a comment does not fail when the other side changes.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
