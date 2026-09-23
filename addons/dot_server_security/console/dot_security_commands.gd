@@ -9,7 +9,9 @@ extends RefCounted
 ## in how long, which rung of the ladder, and whether it was applied or only
 ## would have been.
 
-const CHANNEL := "security"
+# No log channel: console commands, and what they produce is console OUTPUT -- replies
+# to the operator who typed them, which the family's rule says is not a log. The guard
+# they describe logs its own decisions.
 
 
 static func register(guard: DotSecurityManager, console: DotConsole) -> void:
