@@ -21,6 +21,18 @@ var watch: DotSecurityWatch
 var feeds: DotBanFeeds
 var anticheat: DotAntiCheat
 
+## Sections entered against sections that ran to their last line, and against this. A
+## runtime error inside a section aborts that function and nothing says so; a section that
+## bailed out early after a failed guard is counted as not finished on purpose.
+const SECTIONS := 17
+
+## Every check this suite runs, including the two at the end that compare the counts. The
+## section counter cannot see a section that aborted after announcing itself — its remaining
+## checks simply never run — and a total can. See docs/testing.md.
+const CHECKS := 193
+
+var _entered := 0
+var _completed := 0
 var _passed := 0
 var _failed := 0
 
@@ -137,10 +149,29 @@ func _run_selftest() -> void:
 	_test_console()
 
 	print("")
+	# The two guards, as the last two checks. See docs/testing.md.
+	_check(
+		"every section ran to its last line (%d of %d)" % [_completed, SECTIONS],
+		_completed == _entered and _entered == SECTIONS
+	)
+	_check(
+		"every check ran (%d of %d)" % [_passed + _failed + 1, CHECKS],
+		_passed + _failed + 1 == CHECKS
+	)
 	print("%d passed, %d failed" % [_passed, _failed])
 
 	server.shutdown("self-test complete")
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+func _section(title: String) -> void:
+	_entered += 1
+	print(title)
+
+
+## A section reached its last line. See [constant SECTIONS].
+func _done() -> void:
+	_completed += 1
 
 
 func _check(what: String, passed: bool) -> void:
@@ -177,7 +208,7 @@ func _report(event: StringName, subject: String, times: int = 1) -> void:
 # --- Attaching -------------------------------------------------------------
 
 func _test_attach() -> void:
-	print("[attach]")
+	_section("[attach]")
 
 	_check("the guard attached to the server", guard.server == server)
 	_check("it registered itself", DotRegistry.get_service(
@@ -186,13 +217,14 @@ func _test_attach() -> void:
 	_check("the shipped policy loaded", guard.policy.rules.size() > 0)
 	_check("every shipped rule is valid", guard.policy.validate().ok)
 	_check("it is not in dry run for this suite", not guard.is_dry_run())
+	_done()
 
 
 # --- The sliding window ----------------------------------------------------
 
 func _test_windows() -> void:
 	print("")
-	print("[sliding window]")
+	_section("[sliding window]")
 
 	var window := DotSecurityWindow.new(60.0)
 
@@ -223,13 +255,14 @@ func _test_windows() -> void:
 	expiring.add("z", 1.0)
 	OS.delay_msec(150)
 	_check("events fall out of the window", expiring.peek("z") == 0.0)
+	_done()
 
 
 # --- Subjects --------------------------------------------------------------
 
 func _test_subjects() -> void:
 	print("")
-	print("[subjects]")
+	_section("[subjects]")
 
 	_check("a uid subject is prefixed",
 		DotSecuritySubject.for_uid("abc") == "uid:abc")
@@ -251,13 +284,14 @@ func _test_subjects() -> void:
 		not DotSecuritySubject.may_act_on(""))
 	_check("an ordinary address is acted on",
 		DotSecuritySubject.may_act_on("ip:203.0.113.9"))
+	_done()
 
 
 # --- Rules -----------------------------------------------------------------
 
 func _test_rules() -> void:
 	print("")
-	print("[rules]")
+	_section("[rules]")
 
 	var rule := _rule(&"t_basic", &"test.basic", 3)
 	guard.policy.add(rule)
@@ -294,11 +328,12 @@ func _test_rules() -> void:
 	_report(&"test.basic", subject, 5)
 	_check("a removed rule counts nothing",
 		guard.ledger.for_subject(subject).size() == 1)
+	_done()
 
 
 func _test_escalation() -> void:
 	print("")
-	print("[escalation]")
+	_section("[escalation]")
 
 	var rule := _rule(&"t_ladder", &"test.ladder", 2)
 	rule.steps = [
@@ -349,11 +384,12 @@ func _test_escalation() -> void:
 	guard.forget(subject)
 	_check("forgetting clears the offence history",
 		guard.offences_for(&"t_ladder", subject) == 0)
+	_done()
 
 
 func _test_exemptions() -> void:
 	print("")
-	print("[exemptions]")
+	_section("[exemptions]")
 
 	var rule := _rule(&"t_exempt", &"test.exempt", 1)
 	rule.exempt_flags = PackedStringArray(["generic"])
@@ -399,11 +435,12 @@ func _test_exemptions() -> void:
 	)
 	_check("high immunity is exempt too",
 		not high.is_empty() and not high[0].applied)
+	_done()
 
 
 func _test_dry_run() -> void:
 	print("")
-	print("[dry run]")
+	_section("[dry run]")
 
 	# Through the cvar, not the config field: the cvar is registered from the
 	# config at boot and beats it afterwards, which is what lets an operator
@@ -444,11 +481,12 @@ func _test_dry_run() -> void:
 	_check("sv_security 0 stops counting entirely",
 		guard.ledger.for_subject("uid:offswitch").is_empty())
 	_run("sv_security 1")
+	_done()
 
 
 func _test_policy_json() -> void:
 	print("")
-	print("[rules as json]")
+	_section("[rules as json]")
 
 	var policy := DotSecurityPolicy.new()
 	var loaded := policy.apply_dictionary({
@@ -518,13 +556,14 @@ func _test_policy_json() -> void:
 		policy.find(&"from_json").to_dictionary()
 	)
 	_check("a rule round-trips through a dictionary", round_trip.ok)
+	_done()
 
 
 # --- Chat ------------------------------------------------------------------
 
 func _test_chat_detection() -> void:
 	print("")
-	print("[chat detection]")
+	_section("[chat detection]")
 
 	var config := guard.config
 
@@ -562,6 +601,7 @@ func _test_chat_detection() -> void:
 	_check("a different message is not",
 		not w._is_duplicate("uid:d", "something else entirely", config))
 	w.free()
+	_done()
 
 
 ## The string and integer couplings to addons this one must not name.
@@ -571,7 +611,7 @@ func _test_chat_detection() -> void:
 ## mandatory. A comment cannot fail when the other side changes; this can.
 func _test_couplings() -> void:
 	print("")
-	print("[couplings to addons we must not name]")
+	_section("[couplings to addons we must not name]")
 
 	# dot-moderation's subject prefixes.
 	_check("the uid prefix matches dot-moderation",
@@ -613,13 +653,14 @@ func _test_couplings() -> void:
 
 	_check("dot-server still refuses with the wording we match on",
 		str(seen[0]).begins_with(DotSecurityWatch.REFUSAL_PERMISSION))
+	_done()
 
 
 # --- External ban lists ----------------------------------------------------
 
 func _test_ban_index() -> void:
 	print("")
-	print("[ban index]")
+	_section("[ban index]")
 
 	var index := DotBanIndex.new()
 	index.add_uid("banned-account", "listed")
@@ -652,11 +693,12 @@ func _test_ban_index() -> void:
 		not DotBanIndex.looks_like_address("player-12345"))
 	_check("nor is nonsense that looks numeric",
 		not DotBanIndex.looks_like_address("999.999.999.999"))
+	_done()
 
 
 func _test_ban_feed_parsing() -> void:
 	print("")
-	print("[ban feed parsing]")
+	_section("[ban feed parsing]")
 
 	var feed := DotBanFeed.of(&"t", "https://example.org/list")
 
@@ -717,11 +759,12 @@ func _test_ban_feed_parsing() -> void:
 
 	_check("something that is not a list is refused",
 		not DotBanFeeds.parse_payload(feed, 42).ok)
+	_done()
 
 
 func _test_ban_feed_auth() -> void:
 	print("")
-	print("[ban feed authentication]")
+	_section("[ban feed authentication]")
 
 	var feed := DotBanFeed.of(&"auth", "https://example.org/list")
 
@@ -784,11 +827,12 @@ func _test_ban_feed_auth() -> void:
 	_check("fail_closed is accepted as a spelling of refuse_all",
 		DotBanFeed.parse_failure("fail_closed")
 			== DotBanFeed.OnFailure.REFUSE_ALL)
+	_done()
 
 
 func _test_ban_feed_admission() -> void:
 	print("")
-	print("[ban feed admission]")
+	_section("[ban feed admission]")
 
 	# Registered before the feeds node, so the chaining path has something to
 	# find. Two ban sources with neither knowing about the other is a
@@ -834,13 +878,14 @@ func _test_ban_feed_admission() -> void:
 		not feeds.check_admission("listed-account", "1.1.1.1")
 			.error.message.contains("cheating"))
 	feeds.show_upstream_reason = true
+	_done()
 
 
 # --- Anti-cheat ------------------------------------------------------------
 
 func _test_anticheat() -> void:
 	print("")
-	print("[anti-cheat]")
+	_section("[anti-cheat]")
 
 	_check("the detectors attached", anticheat.guard == guard)
 
@@ -971,13 +1016,14 @@ func _test_anticheat() -> void:
 				offenders.append(String(r.id))
 	_check("no shipped behavioural rule ever punishes",
 		offenders.is_empty())
+	_done()
 
 
 # --- The fallback when dot-moderation is not installed ---------------------
 
 func _test_without_moderation() -> void:
 	print("")
-	print("[without a moderation store]")
+	_section("[without a moderation store]")
 
 	# The whole promise of the fallback: a deployment with no dot-moderation
 	# still gets a gag that the player feels, it just does not survive them
@@ -1054,13 +1100,14 @@ func _test_without_moderation() -> void:
 		bool(guard.describe()["moderation"]))
 	_check("which is what sec_status says too",
 		_run("sec_status").contains("durable"))
+	_done()
 
 
 # --- The operator's surface ------------------------------------------------
 
 func _test_console() -> void:
 	print("")
-	print("[console]")
+	_section("[console]")
 
 	for name in [
 		"sec_status", "sec_rules", "sec_rule", "sec_why", "sec_forget",
@@ -1091,6 +1138,7 @@ func _test_console() -> void:
 		_run("sec_bans_check listed-account").contains("cheating"))
 	_check("sec_ac_status reports the peaks",
 		_run("sec_ac_status").contains("peaks seen"))
+	_done()
 
 
 ## A ban source with dot-moderation's shape and none of its identifiers.
