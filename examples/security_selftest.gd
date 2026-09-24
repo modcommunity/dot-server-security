@@ -29,7 +29,7 @@ const SECTIONS := 17
 ## Every check this suite runs, including the two at the end that compare the counts. The
 ## section counter cannot see a section that aborted after announcing itself — its remaining
 ## checks simply never run — and a total can. See docs/testing.md.
-const CHECKS := 193
+const CHECKS := 198
 
 var _entered := 0
 var _completed := 0
@@ -878,6 +878,39 @@ func _test_ban_feed_admission() -> void:
 		not feeds.check_admission("listed-account", "1.1.1.1")
 			.error.message.contains("cheating"))
 	feeds.show_upstream_reason = true
+
+	# A game module loading after boot -- a changelevel -- registers dot-moderation
+	# under the same name, and the registry is last-wins. Captured once at _ready,
+	# the feeds were displaced from every admission after the first level change.
+	var late := StubBanSource.new()
+	DotRegistry.register(DotBanFeeds.BAN_SOURCE, late)
+	await get_tree().process_frame
+	_check("a source registered later does not displace the feeds",
+		DotRegistry.get_service(DotBanFeeds.BAN_SOURCE) == feeds)
+	_check("the feeds chain onto the newcomer",
+		feeds.previous_source == late)
+	late.refuse = "banned-late"
+	_check("so the newcomer's bans are still enforced",
+		not feeds.check_admission("banned-late", "198.51.100.1").ok)
+	late.refuse = ""
+
+	# The module unloading takes its registration with it; the feeds take the seam
+	# back rather than leaving it empty while the next game loads.
+	DotRegistry.unregister_instance(DotBanFeeds.BAN_SOURCE, feeds)
+	await get_tree().process_frame
+	_check("an emptied seam is taken back",
+		DotRegistry.get_service(DotBanFeeds.BAN_SOURCE) == feeds)
+
+	# Something that already chains to the feeds (the booking seam does) is left on
+	# top: going over it again would make the chain a loop.
+	var wrapper := StubBanSource.new()
+	wrapper.previous_source = feeds
+	DotRegistry.register(DotBanFeeds.BAN_SOURCE, wrapper)
+	await get_tree().process_frame
+	_check("a source that already chains to the feeds keeps the seam",
+		DotRegistry.get_service(DotBanFeeds.BAN_SOURCE) == wrapper
+			and feeds.previous_source != wrapper)
+	DotRegistry.register(DotBanFeeds.BAN_SOURCE, feeds)
 	_done()
 
 
@@ -1144,6 +1177,7 @@ func _test_console() -> void:
 ## A ban source with dot-moderation's shape and none of its identifiers.
 class StubBanSource extends RefCounted:
 	var refuse: String = ""
+	var previous_source: Object = null
 
 	func check_admission(uid: String, _address: String) -> DotResult:
 		if refuse != "" and uid == refuse:

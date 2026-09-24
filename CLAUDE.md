@@ -112,7 +112,7 @@ There is no client-side component and there will not be one: a Godot game ships 
 
 `DotBanFeeds` registers as `dot_ban_source`, the seam dot-server already asks on every admission, so nothing in dot-server changes.
 
-**It chains rather than replaces, and that is the bug it exists to avoid.** dot-moderation registers under the same name; whichever readied second would silently win, leaving a deployment with both installed enforcing exactly one. Whatever held the name is captured **before** registering — capture after and the node finds itself and recurses until the stack gives out — and both must say yes.
+**It chains rather than replaces, and that is the bug it exists to avoid.** dot-moderation registers under the same name; whichever readied second would silently win, leaving a deployment with both installed enforcing exactly one. Whatever held the name is captured **before** registering — capture after and the node finds itself and recurses until the stack gives out — and both must say yes. **And it is kept on top, not put there once:** a game's module registers dot-moderation under the same name on every changelevel, and the registry is last-wins, so a chain captured only at `_ready` was displaced by the first level change and the feeds were never asked again. `DotBanFeeds` listens to `DotRegistry.signals()` and, deferred, chains onto whoever arrived and registers itself again — unless the newcomer's own `previous_source` chain already reaches the feeds (dot-server-deploy's party bookings do the same dance), because going on top of that would make the chain a loop.
 
 Other decisions worth not undoing:
 
@@ -155,8 +155,8 @@ find . -name '*.gd' -not -path './.godot/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"
 done
 
-# 188 checks. Exits non-zero on any failure.
-godot --headless --path . res://examples/security_selftest.tscn   # 193 checks
+# Exits non-zero on any failure.
+godot --headless --path . res://examples/security_selftest.tscn   # 198 checks
 ```
 
 The suite runs against the **real** dot-moderation rather than a mock — the durable half of every action goes through it, and a suite that stubbed it would be asserting against its own idea of that addon.

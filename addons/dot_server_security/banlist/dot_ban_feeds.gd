@@ -104,6 +104,17 @@ func _ready() -> void:
 	DotRegistry.register(SERVICE, self)
 	DotRegistry.register(BAN_SOURCE, self)
 
+	# Kept on top, not merely put there once. A game's module registers dot-moderation
+	# under the same name when it loads -- on every changelevel -- and the registry is
+	# last-wins, so a chain captured only here was displaced by the first level change
+	# and the feeds stopped being asked at all, with nothing logged above DEBUG.
+	if chain_previous:
+		var bus := DotRegistry.signals()
+		if not bus.service_registered.is_connected(_on_service_registered):
+			bus.service_registered.connect(_on_service_registered)
+		if not bus.service_unregistered.is_connected(_on_service_unregistered):
+			bus.service_unregistered.connect(_on_service_unregistered)
+
 	for feed in feeds:
 		if feed == null or not feed.enabled:
 			continue
@@ -130,8 +141,74 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	# Disconnected first, or unregistering below would ask this node to take the seam
+	# back on its way out.
+	var bus := DotRegistry.signals()
+	if bus.service_registered.is_connected(_on_service_registered):
+		bus.service_registered.disconnect(_on_service_registered)
+	if bus.service_unregistered.is_connected(_on_service_unregistered):
+		bus.service_unregistered.disconnect(_on_service_unregistered)
+
 	DotRegistry.unregister_instance(SERVICE, self)
 	DotRegistry.unregister_instance(BAN_SOURCE, self)
+
+
+# --- Keeping the seam ------------------------------------------------------
+
+func _on_service_registered(service: StringName, instance: Object) -> void:
+	if service == BAN_SOURCE and instance != self:
+		_rechain.call_deferred()
+
+
+## The holder left (a module unloading): take the seam back, so the feeds still hold
+## while the next game loads.
+func _on_service_unregistered(service: StringName) -> void:
+	if service == BAN_SOURCE:
+		_rechain.call_deferred()
+
+
+## Deferred, because the registration that triggered it is still on the stack, and so
+## that a node registering and chaining in the same frame (dot-server-deploy's party
+## bookings do the same dance) has settled before this reads the seam.
+func _rechain() -> void:
+	if not is_inside_tree() or not chain_previous:
+		return
+
+	var holder := DotRegistry.get_service(BAN_SOURCE)
+
+	if holder == self:
+		return
+
+	# Already asked somewhere down the holder's chain. Going on top again would make
+	# the chain a loop, and every admission would recurse until the stack gave out.
+	if _chain_reaches(holder, self):
+		return
+
+	if holder != null and is_instance_valid(holder) and holder.has_method("check_admission"):
+		previous_source = holder
+	elif previous_source != null and not is_instance_valid(previous_source):
+		previous_source = null
+
+	DotRegistry.register(BAN_SOURCE, self)
+	DotLog.debug(CHANNEL, "ban feeds chained back onto the ban seam", {
+		"previous": previous_source.get_class() if previous_source != null else "none",
+	})
+
+
+## Whether following [code]previous_source[/code] from [param start] arrives at
+## [param target]. Bounded, because the objects down a chain are duck-typed.
+static func _chain_reaches(start: Object, target: Object) -> bool:
+	var at := start
+
+	for i in range(8):
+		if at == null or not is_instance_valid(at):
+			return false
+		if at == target:
+			return true
+		var next: Variant = at.get("previous_source")
+		at = next as Object if next is Object else null
+
+	return false
 
 
 # --- The seam dot-server asks ----------------------------------------------
