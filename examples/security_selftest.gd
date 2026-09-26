@@ -29,7 +29,7 @@ const SECTIONS := 17
 ## Every check this suite runs, including the two at the end that compare the counts. The
 ## section counter cannot see a section that aborted after announcing itself — its remaining
 ## checks simply never run — and a total can. See docs/testing.md.
-const CHECKS := 198
+const CHECKS := 200
 
 var _entered := 0
 var _completed := 0
@@ -1013,6 +1013,26 @@ func _test_anticheat() -> void:
 	_check("anti-cheat dry run reports nothing to the rules",
 		guard.ledger.for_subject(DotSecuritySubject.of_session(
 			quiet, DotSecuritySubject.Scope.UID)).is_empty())
+
+	# Dry run is the path that logs a detection's detail, and some of that detail
+	# is the client's own words: its build string. The log line an admin reads to
+	# decide who cheated must not be writable by the person being judged.
+	var saved_hashes := anticheat.config.accepted_build_hashes
+	anticheat.config.accepted_build_hashes = PackedStringArray(["build-ok"])
+	var logged: Array[String] = []
+	var listen := func(rec: Dictionary) -> void:
+		if str(rec.get("channel", "")) == DotAntiCheat.CHANNEL:
+			logged.append(DotLog.format_line(rec))
+	DotLog.signals().record.connect(listen)
+	anticheat.observe_build(
+		quiet, "evil\ninf security rule tripped rule=forged " + "x".repeat(4000)
+	)
+	DotLog.signals().record.disconnect(listen)
+	anticheat.config.accepted_build_hashes = saved_hashes
+	_check("a client's build string cannot forge a log line",
+		logged.size() == 1 and not logged[0].contains("\n"))
+	_check("nor make one a megabyte long",
+		logged.size() == 1 and logged[0].length() < 400)
 	anticheat.config.dry_run = false
 
 	# The refusal that stops an operator banning a good player on one signal.

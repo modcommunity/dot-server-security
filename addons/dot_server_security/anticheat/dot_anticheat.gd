@@ -38,6 +38,9 @@ extends Node
 const CHANNEL := "anticheat"
 const SERVICE := &"dot_anticheat"
 
+## The longest client-supplied string a logged detection carries. See [method _loggable].
+const LOGGED_STRING_MAX := 96
+
 ## A detector fired. [param impossible] separates proof from suspicion.
 signal detected(
 	session: DotClientSession, kind: StringName, impossible: bool, detail: Dictionary
@@ -424,6 +427,29 @@ func observe_build(session: DotClientSession, build_hash: String) -> void:
 		})
 
 
+## A detection's detail, made safe to write to a log.
+##
+## [b]Some of it is whatever the client said[/b] — [method observe_build]'s `reported` is
+## the client's own build string, and a weapon id can arrive from a command — and
+## [method DotLog.format_fields] quotes a value but does not escape a newline. So a build
+## string of `x\ninf security   ...` wrote a second, forged record into the log an admin
+## reads to decide who cheated, and a megabyte one wrote a megabyte per detection.
+## Strings are escaped and cut here, on the one path that logs a detail; the numbers the
+## server measured itself pass through unchanged.
+static func _loggable(detail: Dictionary) -> Dictionary:
+	var out := {}
+	for key: Variant in detail:
+		var value: Variant = detail[key]
+		if value is String or value is StringName:
+			var text := String(value)
+			var cut := text.length() > LOGGED_STRING_MAX
+			text = text.left(LOGGED_STRING_MAX).c_escape()
+			out[key] = text + ("..." if cut else "")
+		else:
+			out[key] = value
+	return out
+
+
 func _check_headshot_ratio(session: DotClientSession, track: Dictionary) -> void:
 	var shots := int(track["shots"])
 	if shots < config.headshot_min_shots:
@@ -469,7 +495,7 @@ func _report(
 		# can act on it however it is written. A separate switch from the
 		# guard's own dry run, because an operator commonly trusts chat rules
 		# long before a movement threshold they have not measured.
-		DotLog.info(CHANNEL, "would report %s" % kind, detail)
+		DotLog.info(CHANNEL, "would report %s" % kind, _loggable(detail))
 		return
 
 	guard.report_session(kind, session, magnitude, detail)

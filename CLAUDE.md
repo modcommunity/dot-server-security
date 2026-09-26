@@ -156,7 +156,7 @@ find . -name '*.gd' -not -path './.godot/*' | while read f; do
 done
 
 # Exits non-zero on any failure.
-godot --headless --path . res://examples/security_selftest.tscn   # 198 checks
+godot --headless --path . res://examples/security_selftest.tscn   # 200 checks
 ```
 
 The suite runs against the **real** dot-moderation rather than a mock — the durable half of every action goes through it, and a suite that stubbed it would be asserting against its own idea of that addon.
