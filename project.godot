@@ -1,12 +1,10 @@
-; dot-server-security — hardening a dedicated server, as configuration.
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
 ;
-; The distributable is `addons/dot_server_security/`. This project exists so the
-; addon can be opened and validated standalone.
-;
-; `addons/dot_core/` and `addons/dot_server/` are required; `dot_moderation`,
-; `dot_chat` and `dot_auth` are OPTIONAL and are linked here only so the self-test
-; can run the bridges against the real addons rather than against stubs. All three
-; are duck-typed and named nowhere in the source. See CLAUDE.md.
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -21,6 +19,12 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/dot_core/plugin.cfg", "res://addons/dot_server/plugin.cfg", "res://addons/dot_server_security/plugin.cfg")
+
+[importer_defaults]
+
+texture={
+"detect_3d/compress_to": 0
+}
 
 [rendering]
 
