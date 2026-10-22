@@ -28,7 +28,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/dot_server_security/console/` | `DotSecurityCommands`: the operator's whole view; `sec_why` is the one |
 | `addons/dot_server_security/cfg/` | `security_rules.example.json`, `ban_feeds.example.json` |
 | `examples/security_selftest.tscn` | the suite, against the real dot-moderation |
-| `examples/cfg_selftest.tscn` | `security.yml` through `DotSecurityConfig.load_cfg` and `DotAntiCheatConfig.load_cfg`: `cfg/addons/dot_server_security/`, `cfg/server/dot_server_security/` over it, the flat `cfg/security.yml` shim (WARN once, removed 2026-12-31) |
+| `examples/cfg_selftest.tscn` | `security.yml` through `DotSecurityConfig.load_cfg` and `DotAntiCheatConfig.load_cfg`: `cfg/addons/dot_server_security/`, `cfg/server/addons/dot_server_security/` over it, the flat `cfg/security.yml` shim (WARN once, removed 2026-12-31) |
 
 ## Running and testing
 

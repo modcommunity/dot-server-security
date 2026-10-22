@@ -147,7 +147,7 @@ const CFG_KEYS := {
 }
 
 
-## Applies the `sec_*` keys of [param file_name] from `cfg/addons/dot_server_security/`, then the operator's `cfg/server/dot_server_security/`.
+## Applies the `sec_*` keys of [param file_name] from `cfg/addons/dot_server_security/`, then the operator's `cfg/server/addons/dot_server_security/`.
 ## A flat [param legacy_dir]/[param file_name] is still read (one WARN) while no new copy exists. Other keys are skipped.
 func apply_cfg_file(file_name: String = "security.yml", legacy_dir: String = "res://cfg") -> DotResult:
 	return DotAddonConfig.apply_file(CFG_ADDON, file_name, legacy_dir, _apply_cfg_values)
