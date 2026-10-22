@@ -125,6 +125,55 @@ func env_prefix() -> String:
 func cli_prefix() -> String:
 	return "--sec-"
 
+## The addon name [DotAddonConfig] turns into the folder `dot_server_security`.
+const CFG_ADDON := "dot-server-security"
+
+## `security.yml` key -> property, for the guard.
+const CFG_KEYS := {
+	"sec_enabled": "enabled",
+	"sec_dryrun": "dry_run",
+	"sec_rules_file": "rules_file",
+	"sec_notify_subject": "notify_subject",
+	"sec_notify_admins": "notify_admins",
+	"sec_notify_flag": "notify_flag",
+	"sec_announce_removals": "announce_removals",
+	"sec_caps_min_length": "caps_min_length",
+	"sec_caps_ratio": "caps_ratio",
+	"sec_duplicate_memory_sec": "duplicate_memory_sec",
+	"sec_duplicate_depth": "duplicate_depth",
+	"sec_link_allow": "link_allow",
+	"sec_churn_window_sec": "churn_window_sec",
+	"sec_ledger_size": "ledger_size",
+}
+
+
+## Applies the `sec_*` keys of [param file_name] from `cfg/addons/dot_server_security/`, then the operator's `cfg/server/dot_server_security/`.
+## A flat [param legacy_dir]/[param file_name] is still read (one WARN) while no new copy exists. Other keys are skipped.
+func apply_cfg_file(file_name: String = "security.yml", legacy_dir: String = "res://cfg") -> DotResult:
+	return DotAddonConfig.apply_file(CFG_ADDON, file_name, legacy_dir, _apply_cfg_values)
+
+
+func _apply_cfg_values(values: Dictionary, path: String) -> PackedStringArray:
+	var own := {}
+	for raw in values:
+		if CFG_KEYS.has(String(raw)):
+			own[CFG_KEYS[String(raw)]] = values[raw]
+	return apply_dictionary(own, path)
+
+
+## [method apply_cfg_file], then the environment, the command line and validation.
+func load_cfg(file_name: String = "security.yml", legacy_dir: String = "res://cfg") -> DotResult:
+	unknown_keys = PackedStringArray()
+	var file_res := apply_cfg_file(file_name, legacy_dir)
+	if not file_res.ok:
+		return file_res
+	apply_env()
+	apply_cli()
+	var valid := validate()
+	if not valid.ok:
+		return valid.wrap("Configuration is invalid.")
+	return DotResult.success(self)
+
 
 func validate() -> DotResult:
 	if caps_ratio <= 0.0 or caps_ratio > 1.0:

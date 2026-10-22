@@ -141,6 +141,52 @@ func env_prefix() -> String:
 func cli_prefix() -> String:
 	return "--ac-"
 
+## The addon name [DotAddonConfig] turns into the folder `dot_server_security`.
+const CFG_ADDON := "dot-server-security"
+
+## `security.yml` key -> property, for the detectors.
+const CFG_KEYS := {
+	"ac_enabled": "enabled",
+	"ac_dryrun": "dry_run",
+	"ac_watch_movement": "watch_movement",
+	"ac_max_speed": "max_horizontal_speed",
+	"ac_max_vertical_speed": "max_vertical_speed",
+	"ac_max_tick_distance": "max_tick_distance",
+	"ac_max_airborne_sec": "max_airborne_sec",
+	"ac_watch_timing": "watch_timing",
+	"ac_max_time_ratio": "max_time_ratio",
+	"ac_watch_fire_rate": "watch_fire_rate",
+	"ac_fire_interval_tolerance": "fire_interval_tolerance",
+}
+
+
+## Applies the `ac_*` keys of [param file_name] from `cfg/addons/dot_server_security/`, then the operator's `cfg/server/dot_server_security/`.
+## A flat [param legacy_dir]/[param file_name] is still read (one WARN) while no new copy exists. Other keys are skipped.
+func apply_cfg_file(file_name: String = "security.yml", legacy_dir: String = "res://cfg") -> DotResult:
+	return DotAddonConfig.apply_file(CFG_ADDON, file_name, legacy_dir, _apply_cfg_values)
+
+
+func _apply_cfg_values(values: Dictionary, path: String) -> PackedStringArray:
+	var own := {}
+	for raw in values:
+		if CFG_KEYS.has(String(raw)):
+			own[CFG_KEYS[String(raw)]] = values[raw]
+	return apply_dictionary(own, path)
+
+
+## [method apply_cfg_file], then the environment, the command line and validation.
+func load_cfg(file_name: String = "security.yml", legacy_dir: String = "res://cfg") -> DotResult:
+	unknown_keys = PackedStringArray()
+	var file_res := apply_cfg_file(file_name, legacy_dir)
+	if not file_res.ok:
+		return file_res
+	apply_env()
+	apply_cli()
+	var valid := validate()
+	if not valid.ok:
+		return valid.wrap("Configuration is invalid.")
+	return DotResult.success(self)
+
 
 func validate() -> DotResult:
 	if max_time_ratio < 1.0:
