@@ -1,0 +1,8 @@
+# size
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+addons/dot_server_security/console/dot_security_commands.gd::_register_subjects	91
+addons/dot_server_security/runtime/dot_security_manager.gd::attach	105
+examples/security_selftest.gd	1205
+examples/security_selftest.gd::_test_anticheat	157
+examples/security_selftest.gd::_test_ban_feed_admission	85
+examples/security_selftest.gd::_test_without_moderation	83
