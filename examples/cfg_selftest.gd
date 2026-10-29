@@ -1,10 +1,7 @@
 extends Node
 
 ## The yml layout of dot-server-security's settings: new path, flat shim, operator layer.
-##
-## [codeblock]
-## timeout 120 godot --headless --path . res://examples/cfg_selftest.tscn
-## [/codeblock]
+## Run: timeout 120 godot --headless --path . res://examples/cfg_selftest.tscn
 
 const FOLDER := "dot_server_security"
 const FILE := "security.yml"
