@@ -2,12 +2,7 @@ class_name DotSecurityCommands
 extends RefCounted
 
 ## The operator's view of the guard, as console commands and two cvars.
-##
-## [b]`sec_why` is the one that matters.[/b] An automatic punishment nobody can
-## explain gets lifted blindly or refused blindly, and after the second time the
-## operator turns the guard off. This answers which rule, which event, how many
-## in how long, which rung of the ladder, and whether it was applied or only
-## would have been.
+## `sec_why` is the one that matters: a punishment nobody can explain gets lifted or refused blindly, and then the operator turns the guard off. It answers which rule, event, count, rung, and whether applied or only would have been.
 
 # No log channel: console commands, and what they produce is console OUTPUT -- replies
 # to the operator who typed them, which the family's rule says is not a log. The guard
@@ -23,10 +18,7 @@ static func register(guard: DotSecurityManager, console: DotConsole) -> void:
 	_register_anticheat(guard, console)
 
 
-# --- External ban lists ----------------------------------------------------
-#
-# Reached through the registry rather than held, because the feeds are a
-# separate node an operator may not have added at all.
+# Reached through the registry rather than held: the feeds are a separate node an operator may not have added.
 
 static func _bans() -> DotBanFeeds:
 	return DotRegistry.get_service(DotBanFeeds.SERVICE) as DotBanFeeds
@@ -102,7 +94,6 @@ static func _register_bans(_guard: DotSecurityManager, console: DotConsole) -> v
 	)
 
 
-# --- Anti-cheat ------------------------------------------------------------
 
 static func _anticheat() -> DotAntiCheat:
 	return DotRegistry.get_service(DotAntiCheat.SERVICE) as DotAntiCheat
@@ -330,10 +321,8 @@ static func _register_subjects(guard: DotSecurityManager, console: DotConsole) -
 			for subject in subjects:
 				cleared += guard.forget(subject)
 
-			# Said plainly, because this is what an operator runs after lifting a
-			# punishment by hand: without it the next event escalates from where
-			# the ladder left off and the person they just forgave is gagged
-			# again for one message.
+			# Said plainly: this is what an operator runs after lifting a punishment by hand, and without it
+			# the next event escalates from where the ladder left off and the person just forgiven is gagged again.
 			ctx.reply("Cleared %d offence record(s) and every counter for %s."
 				% [cleared, target]),
 		"Forget a subject's counters and offence history. sec_forget <who|all>",

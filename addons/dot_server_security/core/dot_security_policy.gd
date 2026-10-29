@@ -3,26 +3,13 @@ class_name DotSecurityPolicy
 extends Resource
 
 ## The rule set, and the defaults an operator starts from.
-##
-## [b]The shipped rules are deliberately timid.[/b] Every threshold here is one
-## that an ordinary busy server will not reach and every first step is a warning.
-## A guard that punishes a friendly community on its defaults is a guard that gets
-## turned off, and a server with the addon installed and disabled is less safe
-## than one that never installed it — because somebody believes it is protected.
-##
-## The ladders go somewhere, though. A subject that keeps going past a warning
-## reaches a gag, then a long gag, then removal, which is what an operator wanted
-## when they installed this and what they should not have to write themselves.
-##
-## Rules are replaced or extended from JSON, which is the surface that matters:
-## a rule an operator can only express by editing GDScript is one most operators
-## will never change.
+## The shipped rules are deliberately timid, every first step a warning: a guard that punishes a friendly community on its defaults gets turned off, and an installed-but-disabled guard is worse than none because somebody believes it protects.
+## Ladders escalate to a gag, a long gag, then removal. Rules are replaced or extended from JSON, since a rule only expressible in GDScript is one operators never change.
 
 ## Rules, in the order they were added. Order does not affect evaluation.
 @export var rules: Array[DotSecurityRule] = []
 
 
-# --- The shipped set -------------------------------------------------------
 
 ## Every default rule. Each one is separately disable-able by id.
 static func defaults() -> DotSecurityPolicy:
@@ -210,11 +197,7 @@ static func _auth_failures() -> DotSecurityRule:
 
 
 ## A password spray against the remote console.
-##
-## [b]The most valuable rule here and the only one whose first step removes.[/b]
-## dot-server already locks an address out after `rcon_max_failures`, but that
-## lockout is per-process and forgotten on restart; this is what turns a spray
-## into a record that outlives it. Nobody mistypes an RCON password five times.
+## The most valuable rule here and the only one whose first step removes: dot-server's lockout is per-process and forgotten on restart; this leaves a record. Nobody mistypes an RCON password five times.
 static func _rcon_bruteforce() -> DotSecurityRule:
 	var rule := DotSecurityRule.of(
 		&"rcon_bruteforce", DotSecurityEvent.RCON_AUTH_FAILED, 5, 300.0
@@ -231,21 +214,9 @@ static func _rcon_bruteforce() -> DotSecurityRule:
 	return rule
 
 
-# --- Anti-cheat ------------------------------------------------------------
-#
-# Two kinds of rule, and the split is the whole of the honesty here.
-#
-# The IMPOSSIBLE ones act, because the server did the arithmetic: the client
-# claimed something the game cannot produce. The BEHAVIOURAL ones only ever warn
-# and tell the admins, because every one of them also describes a very good
-# player on a very good day — and a community remembers a wrongly banned good
-# player far longer than it remembers a cheat. DotAntiCheat refuses at boot to
-# let a behavioural rule punish on a single detection; these are what it expects
-# to find instead.
-#
-# None of them fire at all until an operator has measured their game: the
-# envelope thresholds in DotAntiCheatConfig ship at 0, which is off, and the
-# detector ships in its own dry run besides.
+# Impossible detections act (the server did the arithmetic); behavioural ones only warn and tell admins, since each also describes a very good player.
+# DotAntiCheat refuses at boot to let a behavioural rule punish on one detection; these are what it expects instead.
+# None fire until an operator has measured their game: envelope thresholds ship at 0 and the detector ships in its own dry run.
 
 ## Movement the movement code could not have produced.
 static func _cheat_impossible() -> DotSecurityRule:
@@ -313,10 +284,7 @@ static func _cheat_reach() -> DotSecurityRule:
 
 
 ## A client that is not running what it says it is.
-##
-## The one rule whose threshold is 1, and it is allowed to be: the client either
-## reported an accepted build hash or it did not, and there is no good day on
-## which a legitimate player reports a hash the operator never published.
+## The one rule whose threshold is 1: the client either reported an accepted build hash or not, and no legitimate player reports a hash the operator never published.
 static func _cheat_integrity() -> DotSecurityRule:
 	var rule := DotSecurityRule.of(
 		&"cheat_integrity", DotAntiCheatEvent.INTEGRITY, 1, 60.0
@@ -355,7 +323,6 @@ static func _cheat_trigger() -> DotSecurityRule:
 	return rule
 
 
-# --- Access ----------------------------------------------------------------
 
 func find(id: StringName) -> DotSecurityRule:
 	for rule in rules:
@@ -432,19 +399,9 @@ func validate() -> DotResult:
 	return DotResult.success(self)
 
 
-# --- Serialisation ---------------------------------------------------------
 
-## Layers a JSON file over this policy.
-##
-## ```json
-## { "rules": [ { "id": "chat_flood", "threshold": 4, "window_sec": 8 } ] }
-## ```
-##
-## [b]A named rule is replaced whole, not merged field by field.[/b] Merging
-## reads better in an example and is worse in practice: an operator who removes
-## a step from their copy of a rule expects it gone, and a merge would keep the
-## shipped ladder underneath and apply it. The dumped file is a complete rule
-## set for exactly this reason — copy it, edit it, and what you see is what runs.
+## Layers a JSON file over this policy: ```{ "rules": [ { "id": "chat_flood", "threshold": 4, "window_sec": 8 } ] }```
+## A named rule is replaced whole, not merged: a merge would keep the shipped ladder under a step the operator removed. The dumped file is a complete rule set, so what you see is what runs.
 func apply_json_file(path: String) -> DotResult:
 	if path.strip_edges() == "":
 		return DotResult.success(self)

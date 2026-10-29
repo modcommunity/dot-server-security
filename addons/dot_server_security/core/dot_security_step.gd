@@ -2,26 +2,8 @@
 class_name DotSecurityStep
 extends Resource
 
-## One rung of a rule's escalation ladder.
-##
-## [b]The ladder is the whole reason this addon is more than a rate limiter.[/b]
-## A flat rule has one answer for a first offence and a fiftieth, so an operator
-## picks between punishing a new player for typing too fast and letting a spammer
-## run. Neither is the answer anybody wants. Steps let the rule say what it
-## actually means: warn, then gag briefly, then gag properly, then remove.
-##
-## [codeblock]
-## rule.steps = [
-##     DotSecurityStep.of(DotSecurityAction.Kind.WARN),
-##     DotSecurityStep.of(DotSecurityAction.Kind.GAG, 300),      # 5 minutes
-##     DotSecurityStep.of(DotSecurityAction.Kind.GAG, 1800),     # 30 minutes
-##     DotSecurityStep.of(DotSecurityAction.Kind.KICK),
-##     DotSecurityStep.of(DotSecurityAction.Kind.BAN, 86400),    # a day
-## ]
-## [/codeblock]
-##
-## Offences past the last step repeat the last step, which is deliberate: a ladder
-## that ran out and fell back to doing nothing would reward persistence.
+## One rung of a rule's escalation ladder: warn, then gag briefly, then gag properly, then remove.
+## A flat rule has one answer for a first offence and a fiftieth. Offences past the last step repeat it, since a ladder that fell back to nothing would reward persistence.
 
 @export var action: DotSecurityAction.Kind = DotSecurityAction.Kind.WARN
 

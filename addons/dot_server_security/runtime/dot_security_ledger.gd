@@ -1,17 +1,9 @@
 class_name DotSecurityLedger
 extends RefCounted
 
-## What the guard did, and why.
-##
-## [b]An automatic punishment nobody can explain is worse than none.[/b] A player
-## appeals, an operator looks, and the only thing to look at is that they are
-## gagged — so either the operator lifts it blindly or refuses blindly, and after
-## the second time they turn the guard off. `sec_why <player>` answers out of
-## this: which rule, which event, how many in how long, which rung of the ladder,
-## and whether it was actually applied or only would have been.
-##
-## Bounded, oldest-first. It is a debugging aid, not an audit trail — dot-server's
-## audit log and dot-moderation's records are where a punishment durably lives.
+## What the guard did, and why: the answer behind `sec_why <player>` (which rule, event, count, rung, applied or only would-have-been).
+## An unexplainable automatic punishment gets lifted or refused blindly, and then the guard is turned off.
+## Bounded, oldest-first; a debugging aid, not an audit trail (dot-server's audit log and dot-moderation hold those).
 
 ## One decision.
 class Entry extends RefCounted:

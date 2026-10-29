@@ -2,23 +2,7 @@ class_name DotSecurityAction
 extends RefCounted
 
 ## What a rule does when it trips, and the two backends that can do it.
-##
-## [b]Every action has a durable form and a fallback, and the difference matters
-## to an operator.[/b] With dot-moderation installed, a gag is a record: stored,
-## expiring, revocable, surviving a reconnect and a restart, visible in that
-## addon's own listing beside the ones a human issued. Without it, a gag is two
-## booleans on a session object — which is dot-server's own mute, and a session
-## dies with its connection, so the player reconnects and talks.
-##
-## Both are supported because refusing to act without dot-moderation would make
-## the whole addon conditional on another optional one, and a five-minute gag that
-## a determined spammer can reconnect out of is still worth having against the
-## ninety-nine per cent who will not think to.
-##
-## [b]dot-moderation is named nowhere here.[/b] It is reached duck-typed through
-## whatever registered as [code]dot_moderation[/code], for the usual reason: a
-## script mentioning a [code]class_name[/code] the project does not have fails to
-## parse and takes every script referencing it down with it.
+## Each action has a durable form (a dot-moderation record, surviving reconnect) and a fallback (session flags, gone with the connection); both are supported so this addon does not depend on another optional one. dot-moderation is reached duck-typed via `dot_moderation`, never named, since a missing class_name fails to parse.
 
 enum Kind {
 	## Count and remember, do nothing. What a rule is set to while it is being
@@ -39,9 +23,7 @@ enum Kind {
 }
 
 ## dot-moderation's own Kind values, which this addon must not name.
-##
-## The other half of the coupling described on [DotSecuritySubject], and asserted
-## against the real addon in the self-test for the same reason.
+## The other half of the coupling described on [DotSecuritySubject], asserted against the real addon in the self-test.
 const MOD_KIND_BAN := 0
 const MOD_KIND_KICK := 1
 const MOD_KIND_VOICE_MUTE := 2
@@ -79,10 +61,7 @@ static func is_removal(kind: int) -> bool:
 
 
 ## Whether a duration means anything for this action.
-##
-## A kick has no duration — it happens once and is over, which is why
-## dot-moderation calls it history rather than a state — and a warn records one
-## only so a listing can say how long the note stands.
+## A kick happens once and is over; a warn records one only so a listing can say how long the note stands.
 static func takes_duration(kind: int) -> bool:
 	return kind == Kind.GAG or kind == Kind.VOICE_MUTE \
 		or kind == Kind.SILENCE or kind == Kind.BAN
@@ -100,14 +79,9 @@ static func format_duration(seconds: int) -> String:
 	return "%.1fd" % (seconds / 86400.0)
 
 
-# --- Applying --------------------------------------------------------------
 
 ## Carries out an action. Returns what was done, for the ledger.
-##
-## [param moderation] is whatever registered as [code]dot_moderation[/code], or
-## null. [param session] is the live session when there is one — a subject may
-## have no session at all (an address that never finished connecting), in which
-## case only the durable backend can do anything and the fallback does nothing.
+## [param moderation] is whatever registered as `dot_moderation`, or null. [param session] may be null (an address that never finished connecting): then only the durable backend can act.
 static func apply(
 	kind: int,
 	subject: String,
@@ -130,10 +104,8 @@ static func apply(
 		kind, subject, duration_sec, reason, issuer, moderation
 	)
 
-	# The durable backend records; the session backend is what the player
-	# actually feels this second. Both run when both can: dot-moderation's gag is
-	# consulted on the chat path through `dot_mute_source`, but a session already
-	# mid-message should not get one more line out because a store was slow.
+	# The durable backend records; the session backend is what the player feels this second. Both run when both can:
+	# a session already mid-message must not get one more line out because a store was slow.
 	var immediate := _apply_to_session(kind, duration_sec, reason, server, session)
 
 	if durable.ok:
@@ -200,11 +172,9 @@ static func _issue(
 	reason: String,
 	issuer: String
 ) -> DotResult:
-	# issuer_immunity is deliberately the maximum. The guard is not a moderator
-	# with a rank: a rule that declined to act because the target out-ranked a
-	# number nobody chose would be a rule that silently protects exactly the
-	# people most able to abuse the server. Who is exempt is decided by the rule's
-	# own exemptions, in one place, on purpose.
+	# issuer_immunity is deliberately the maximum: the guard is not a ranked moderator, and declining to act on a higher
+	# rank would silently protect the people best placed to abuse the server. Exemptions are decided in one place,
+	# the rule's own.
 	var issued: Variant = moderation.call(
 		"issue", mod_kind, subject, reason, issuer, duration_sec, 0x7FFFFFFF
 	)

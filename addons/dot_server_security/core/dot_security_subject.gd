@@ -1,36 +1,9 @@
 class_name DotSecuritySubject
 extends RefCounted
 
-## Who a counter counts against, and the reason that is a decision rather than a
-## detail.
-##
-## [b]Count against a connection and you have counted nothing.[/b] A peer id dies
-## with the socket, so "five messages in ten seconds" is dodged by reconnecting,
-## and every spammer works that out within a minute. The scope is what survives:
-## an account across reconnects, an address across accounts.
-##
-## Which one to use is per rule, and the two answer different questions:
-##
-## [b]UID[/b] is right for behaviour that is a person's — chat, commands, votes.
-## It follows them onto a new address and it does not punish the sibling on the
-## same connection.
-##
-## [b]ADDRESS[/b] is right for anything that happens [i]before[/i] there is an
-## identity, which is most of what an attack is: connection floods, wrong RCON
-## passwords, authentication that never completed. There is nobody to attribute
-## those to yet.
-##
-## [b]BOTH[/b] counts the same event twice, once in each scope, so one rule can
-## catch "this account is spamming" and another "this address is spamming from a
-## different account each time". It is the right answer more often than it looks,
-## and it is not the default because it doubles the counters.
-##
-## [b]The prefixes mirror dot-moderation's, and this addon must not name it.[/b]
-## dot-moderation is optional, and a script mentioning a [code]class_name[/code]
-## the project does not have fails to parse and takes every script referencing it
-## down with it — so the two spellings of a subject live in two repositories and
-## have to agree. They are asserted equal against the real addon in the self-test
-## rather than trusted to a comment here, because a comment does not fail.
+## Who a counter counts against. A peer id dies with the socket, so counting per connection is dodged by reconnecting; the scope is what survives (docs/rationale.md).
+## UID follows an account across addresses (chat, commands, votes); ADDRESS covers what happens before an identity exists (connection floods, wrong RCON passwords); BOTH counts each event in both scopes, at double the counters.
+## The prefixes mirror dot-moderation's, which this addon must not name; the self-test asserts they agree with the real addon, since a comment does not fail.
 
 enum Scope {
 	## The account behind the event. Survives a reconnect.
@@ -45,12 +18,7 @@ const PREFIX_UID := "uid:"
 const PREFIX_ADDRESS := "ip:"
 
 ## Addresses no rule may act against, however it is configured.
-##
-## Loopback is the operator's own console and every headless test; acting on it
-## means the first thing the guard does is lock the operator out of their own
-## server. "unknown" is what the transport reports when a peer cannot be asked,
-## which is every such client in one bucket — a guard that bans it refuses
-## everybody while looking idle.
+## Loopback is the operator's own console and every headless test; "unknown" is every client the transport could not ask, in one bucket, so banning it refuses everybody while looking idle.
 const NEVER_ACT: Array[String] = ["127.0.0.1", "::1", "localhost", "unknown", ""]
 
 
@@ -79,10 +47,7 @@ static func value_of(subject: String) -> String:
 
 
 ## Strips the IPv6 mapping an IPv4 client gets from a dual-stack listener.
-##
-## [code]::ffff:192.168.1.5[/code] and [code]192.168.1.5[/code] are one address,
-## and counting them as two is how a limit is dodged by nothing more than which
-## socket the server happened to open.
+## `::ffff:192.168.1.5` and `192.168.1.5` are one address; counting them as two lets a limit be dodged by which socket was opened.
 static func normalise_address(address: String) -> String:
 	var out := address.strip_edges().to_lower()
 	if out.begins_with("::ffff:"):
@@ -91,10 +56,7 @@ static func normalise_address(address: String) -> String:
 
 
 ## The subject for a session in one scope. [constant Scope.BOTH] resolves to UID.
-##
-## BOTH is not a subject — it is two — so anything needing one string gets the
-## account, which is the more specific of the two. [method all_of_session] is what
-## a caller that means both should use.
+## BOTH is two subjects, so a caller needing one string gets the more specific account; use [method all_of_session] to mean both.
 static func of_session(session: DotClientSession, scope: int) -> String:
 	if session == null:
 		return ""
@@ -136,10 +98,7 @@ static func all_of_session(session: DotClientSession, scope: int) -> PackedStrin
 
 
 ## Whether the guard is allowed to act against this subject at all.
-##
-## Checked at the action, not at the count. The counters may run for loopback —
-## `sec_status` showing what the operator's own traffic would have tripped is
-## useful — but nothing is ever done about it.
+## Checked at the action, not the count: counters may run for loopback (`sec_status` shows what it would have tripped), but nothing is done.
 static func may_act_on(subject: String) -> bool:
 	if subject.strip_edges() == "":
 		return false

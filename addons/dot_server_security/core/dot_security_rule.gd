@@ -2,28 +2,8 @@
 class_name DotSecurityRule
 extends Resource
 
-## One thing the guard watches for, and what it does about it.
-##
-## A rule is "**this many of that event, from one subject, within this window** —
-## then take the next step on the ladder". Everything else on it is about not
-## catching the wrong person.
-##
-## [codeblock]
-## # Mute for five minutes on six messages in ten seconds, escalating.
-## var rule := DotSecurityRule.of(&"chat_spam", DotSecurityEvent.CHAT_MESSAGE, 6, 10.0)
-## rule.scope = DotSecuritySubject.Scope.UID
-## rule.steps = [
-##     DotSecurityStep.of(DotSecurityAction.Kind.WARN),
-##     DotSecurityStep.of(DotSecurityAction.Kind.GAG, 300),
-##     DotSecurityStep.of(DotSecurityAction.Kind.GAG, 1800),
-##     DotSecurityStep.of(DotSecurityAction.Kind.KICK),
-## ]
-## [/codeblock]
-##
-## [b]Every rule ships disabled-able and most ship conservative.[/b] A guard that
-## punishes a busy, friendly server on its defaults is a guard an operator turns
-## off entirely, and then it is protecting nothing. The shipped set is in
-## [DotSecurityPolicy].
+## One thing the guard watches for: "this many of that event, from one subject, within this window", then take the next step on the ladder.
+## Everything else on it is about not catching the wrong person. Build one with [method of] and set [member steps]; the shipped set is in [DotSecurityPolicy].
 
 ## Identifier, used in `sec_status`, in the ledger and to disable one rule.
 @export var id: StringName = &""
@@ -34,20 +14,14 @@ extends Resource
 @export_group("What to watch")
 
 ## The event this counts. See [DotSecurityEvent] for the shipped vocabulary.
-##
-## Any name works, including a game's own — that is the point of the vocabulary
-## being open.
+## Any name works, including a game's own.
 @export var event: StringName = &""
 
 ## How many (by summed weight) before the rule trips.
 @export_range(1, 10000, 1) var threshold: int = 5
 
 ## The window the count is taken over, in seconds.
-##
-## [b]A sliding window, not a bucket.[/b] Five messages at 0.9s and five more at
-## 1.1s is ten messages in a two-second window, and a fixed bucket resetting on
-## the second boundary sees two counts of five and trips on neither. That is the
-## classic way a rate limit is walked straight through.
+## A sliding window, not a bucket: five messages at 0.9s and five at 1.1s are ten in two seconds, which a bucket resetting on the boundary sees as two fives and trips on neither.
 @export_range(0.1, 86400.0, 0.1) var window_sec: float = 10.0
 
 @export_group("Who it is against")
@@ -67,48 +41,30 @@ extends Resource
 @export var duration_sec: int = 0
 
 ## How long an offence is remembered for escalation, in seconds.
-##
-## [b]Separate from [member window_sec], and the difference is the point.[/b] The
-## window is how fast the behaviour has to be to count as an offence at all; this
-## is how long the server holds it against them. Ten seconds and a day are both
-## reasonable, and they are not the same number: somebody who spammed this
-## morning and spams again tonight should not start again at "warn", and somebody
-## who spammed a fortnight ago should.
+## Separate from [member window_sec]: the window is how fast the behaviour must be to count at all, this is how long the server holds it against them. Spamming this morning and tonight should not restart at "warn".
 @export_range(0.0, 2592000.0, 1.0) var offence_memory_sec: float = 3600.0
 
-## Seconds after tripping during which this rule will not trip again for the same
-## subject.
-##
-## Without it a rule whose action does not stop the behaviour — a warn — trips on
-## every subsequent event, walking the whole ladder in one second and banning
-## somebody for four messages. It is the single most important setting here and
-## the one an operator is least likely to think of.
+## Seconds after tripping during which this rule will not trip again for the same subject.
+## Without it a rule whose action does not stop the behaviour (a warn) trips on every event, walking the whole ladder in a second. The setting an operator is least likely to think of.
 @export_range(0.0, 3600.0, 0.5) var cooldown_sec: float = 5.0
 
 @export_group("Who is exempt")
 
 ## Admin flags that make a subject immune to this rule.
-##
-## Checked against the session's own permissions. An admin tidying a chat flood
-## by talking over it should not be gagged for it.
+## Checked against the session's own permissions, so an admin tidying a flood is not gagged for it.
 @export var exempt_flags: PackedStringArray = PackedStringArray(["generic"])
 
 ## Immunity at or above which this rule does not act. 0 disables the check.
 @export_range(0, 100, 1) var exempt_immunity: int = 0
 
 ## Never act on a player who has been connected less than this long, in seconds.
-##
-## Off by default. Turn it on for rules about behaviour a new player cannot have
-## earned; leave it off for connection and authentication rules, where the
-## attacker is by definition new.
+## Off by default. For behaviour a new player cannot have earned; leave off for connection and authentication rules, where the attacker is new.
 @export_range(0.0, 3600.0, 1.0) var grace_sec: float = 0.0
 
 @export_group("Reporting")
 
 ## Why, in the punishment record and in what the player is told.
-##
-## [code]{count}[/code], [code]{threshold}[/code], [code]{window}[/code],
-## [code]{event}[/code] and [code]{offence}[/code] are substituted.
+## [code]{count}[/code], [code]{threshold}[/code], [code]{window}[/code], [code]{event}[/code] and [code]{offence}[/code] are substituted.
 @export var reason: String = "Automatic: {count} {event} in {window}s"
 
 ## Log every trip at info rather than debug.
@@ -129,12 +85,9 @@ static func of(
 	return rule
 
 
-# --- Decisions -------------------------------------------------------------
 
 ## The step for the nth offence, counting from 1.
-##
-## Past the end of the ladder the last step repeats: running out and reverting to
-## nothing would reward persistence, which is the opposite of what a ladder is.
+## Past the end of the ladder the last step repeats; reverting to nothing would reward persistence.
 func step_for(offence: int) -> DotSecurityStep:
 	if steps.is_empty():
 		return DotSecurityStep.of(action, duration_sec)
@@ -183,7 +136,6 @@ func render_reason(count: float, offence: int) -> String:
 		.replace("{offence}", str(offence))
 
 
-# --- Validation ------------------------------------------------------------
 
 func validate() -> DotResult:
 	if String(id).strip_edges() == "":
@@ -225,13 +177,9 @@ func validate() -> DotResult:
 	return DotResult.success(self)
 
 
-# --- Serialisation ---------------------------------------------------------
 
 ## Reads a rule from a dictionary, which is how an operator writes one.
-##
-## [b]This is the configuration surface that matters.[/b] A rule an operator can
-## only express by editing GDScript is a rule most operators will not change, and
-## the whole value of this addon is in being tuned to a particular community.
+## The configuration surface that matters: a rule only expressible in GDScript is one most operators will not tune.
 static func from_dictionary(raw: Dictionary) -> DotResult:
 	var rule := DotSecurityRule.new()
 

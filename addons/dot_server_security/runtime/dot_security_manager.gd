@@ -2,24 +2,9 @@
 class_name DotSecurityManager
 extends Node
 
-## The guard: counts what the watchers report, decides, and acts.
-##
-## Place one beside a [DotServer] and it attaches itself. The watchers in
-## `watch/` are separate nodes that report into [method report]; a game reports
-## its own events the same way, which is why the event vocabulary is open.
-##
-## [codeblock]
-## var guard := DotSecurityManager.new()
-## guard.config.dry_run = false          # after a week of reading sec_status
-## server.add_child(guard)
-## [/codeblock]
-##
-## [b]It ships in dry run.[/b] Every rule evaluates and every trip is logged and
-## recorded, and nobody is punished until an operator says so. See
-## [member DotSecurityConfig.dry_run] for why that is not timidity.
-##
-## Registered as [code]dot_security[/code] in [DotRegistry], so a watcher or a
-## game finds it without being handed a reference.
+## The guard: counts what the watchers report, decides, and acts. Place one beside a [DotServer] and it attaches itself; registered as [code]dot_security[/code].
+## A game reports its own events through [method report] too, which is why the event vocabulary is open.
+## It ships in dry run: see [member DotSecurityConfig.dry_run].
 
 const CHANNEL := "security"
 const SERVICE := &"dot_security"
@@ -51,10 +36,7 @@ signal acted(subject: String, action: int, duration_sec: int, rule_id: StringNam
 var server: DotServer = null
 
 ## Whatever registered as `dot_moderation`, or null. Duck-typed; never named.
-##
-## [b]Read through [method moderation_store] rather than directly.[/b] This is the cached
-## answer and it is allowed to be stale on purpose; see that method for why a value latched
-## at [method attach] is the wrong one on almost every server in this family.
+## Read through [method moderation_store]: this cached value may be stale on purpose, as a value latched at [method attach] is wrong on almost every server here.
 var moderation: Object = null
 
 var ledger: DotSecurityLedger = null
@@ -80,10 +62,8 @@ func _ready() -> void:
 	if server_ref == null:
 		server_ref = DotNodeRef.of_service(DotServer.SERVICE)
 
-	# Same reasoning as dot-server-query's host: a guard placed in a scene beside
-	# a server is ready before that server has booted, and a server registers
-	# itself part-way through boot(). Giving up there is a server that comes up
-	# unguarded with nothing in the log to say why.
+	# A guard placed beside a server is ready before that server has booted and registered itself,
+	# so giving up here leaves a server unguarded with nothing in the log to say why.
 	if server_ref.mode == DotNodeRef.Mode.REGISTRY \
 			and DotRegistry.get_service(server_ref.service) == null:
 		var waited := await DotRegistry.await_service(
@@ -108,7 +88,6 @@ func _exit_tree() -> void:
 	DotRegistry.unregister_instance(SERVICE, self)
 
 
-# --- Bringing up -----------------------------------------------------------
 
 func attach() -> DotResult:
 	if _attached:
@@ -182,13 +161,9 @@ func attach() -> DotResult:
 	)
 
 	if moderation == null:
-		# Named once, at boot, because the difference is invisible afterwards: a
-		# gag still happens, it just does not survive the player reconnecting.
-		#
-		# "not yet", rather than "none": a game's module publishes the store and is
-		# loaded after the server boots, so this is the ordinary case on a server that
-		# ends up with a perfectly good store a second later. `sec_status` is the answer
-		# to what is actually in force -- it asks again.
+		# Named once, at boot, because the difference is invisible afterwards: a gag still happens but does not survive a reconnect.
+		# "not yet", rather than "none": a game's module publishes the store after the server boots, so this is the ordinary case.
+		# `sec_status` asks again and says what is in force.
 		DotLog.info(
 			CHANNEL,
 			"no moderation store yet: until one registers, punishments last only as "
@@ -199,22 +174,8 @@ func attach() -> DotResult:
 
 
 ## The durable punishment store, looked up again if it was not there at [method attach].
-##
-## [b]The guard almost always starts before the store exists, and latching the answer meant
-## it never found one.[/b] A [DotSecurityManager] is placed beside a [DotServer] and
-## attaches as the server boots; dot-moderation's manager is built by the GAME, in a module
-## that dot-server loads afterwards — so `DotRegistry.get_service(&"dot_moderation")` at
-## attach time is null on every server in this family that has a moderation store at all.
-## What follows is silent and severe in exactly the way this addon exists to prevent: every
-## gag, mute and ban the guard issues falls back to the session, the punishment dies with
-## the connection, and the person it was issued against reconnects and carries on. Nothing
-## errors, because a server with no store is a supported configuration and reports itself
-## as one.
-##
-## Looked up **again** rather than **every time**: the registry lookup is a dictionary
-## read, but it happens on the path where somebody is being punished, and once found the
-## answer does not change for the life of the server. A game change frees the old store and
-## builds a new one, so the cached value is dropped when it stops being valid.
+## The guard almost always starts before the store exists (the game's module loads after the server boots), and latching null meant every gag and ban silently fell back to the session, undone by reconnecting (docs/rationale.md).
+## Looked up again rather than every time; the cached value is dropped when a game change frees the store.
 func moderation_store() -> Object:
 	if moderation != null and is_instance_valid(moderation):
 		return moderation
@@ -250,7 +211,6 @@ func _reindex() -> void:
 			)
 
 
-# --- The hot path ----------------------------------------------------------
 
 ## Whether the guard is counting at all.
 func is_enabled() -> bool:
@@ -271,10 +231,7 @@ func is_dry_run() -> bool:
 
 
 ## Reports one event. The entry point for every watcher and for a game's own.
-##
-## Cheap when nothing watches the event: one dictionary lookup and a return, so a
-## watcher reporting every chat message on a server with no chat rules costs
-## almost nothing.
+## Cheap when nothing watches the event: one dictionary lookup and a return.
 func report(event: DotSecurityEvent) -> void:
 	if event == null or not is_enabled():
 		return
@@ -304,10 +261,8 @@ func report_session(
 	if rules.is_empty():
 		return
 
-	# Built per scope, because the subject a rule counts against depends on the
-	# rule. Two rules on one event with different scopes is a supported and
-	# useful arrangement — "this account is spamming" and "this address is
-	# spamming from a new account each time" are different questions.
+	# Built per scope, because the subject depends on the rule: two rules on one event with different scopes
+	# ("this account is spamming", "this address spams from a new account each time") are a supported arrangement.
 	for entry in rules:
 		var rule: DotSecurityRule = entry
 		for subject in DotSecuritySubject.all_of_session(session, rule.scope):
@@ -423,10 +378,8 @@ func _act(
 		else:
 			acted.emit(event.subject, step.action, step.duration_sec, rule.id)
 
-	# The counter is cleared whatever happened, including in dry run. Leaving it
-	# standing would trip the same rule on the very next event and report an
-	# escalation that the behaviour did not earn — which in dry run is the
-	# difference between a readable report and a thousand lines about one person.
+	# The counter is cleared whatever happened, including in dry run: leaving it would trip the same rule on the next event
+	# and report an escalation the behaviour did not earn, a thousand lines about one person.
 	var window: DotSecurityWindow = _windows.get(rule.id)
 	if window != null:
 		window.clear_subject(event.subject)
@@ -495,9 +448,7 @@ func _notify(
 
 
 ## Drops offence records nothing could still escalate from.
-##
-## Bounded for the same reason the windows are: one entry per rule per subject
-## grows with every address that ever tripped anything.
+## Bounded like the windows: one entry per rule per subject grows with every address that ever tripped anything.
 func _sweep_offences(now: int) -> void:
 	if now - _last_offence_sweep < 300:
 		return
@@ -518,7 +469,6 @@ func _sweep_offences(now: int) -> void:
 		_offences.erase(key)
 
 
-# --- Operator surface ------------------------------------------------------
 
 ## How many offences a subject has on record for a rule.
 func offences_for(rule_id: StringName, subject: String) -> int:
@@ -533,10 +483,7 @@ func count_for(rule_id: StringName, subject: String) -> float:
 
 
 ## Forgets everything about a subject: counters and offence history.
-##
-## What an operator runs after lifting a punishment by hand. Without it the next
-## event escalates from where the ladder left off, and the person they just
-## forgave is gagged again for one message.
+## For after lifting a punishment by hand; otherwise the next event escalates from where the ladder left off and the person just forgiven is gagged again.
 func forget(subject: String) -> int:
 	var cleared := 0
 
@@ -585,14 +532,7 @@ func reload_rules() -> DotResult:
 
 
 ## Registers the cvars and commands, waiting for the console if it is not up.
-##
-## [b]A guard attaches before the server boots, and the console does not exist
-## until it does.[/b] A guard placed in a scene beside a server is ready first —
-## that is the ordinary arrangement — so registering here unconditionally
-## silently produced a server with a working guard, no `sec_status`, no
-## `sec_why`, and no `sv_security` to turn it off with. Nothing errored, because
-## there was nothing to error: the console was simply null and the registration
-## returned.
+## A guard beside a server is ready before the console exists, and registering unconditionally silently left a working guard with no `sec_status`, `sec_why` or `sv_security` (docs/rationale.md).
 func _register_console() -> void:
 	if server == null:
 		return
@@ -601,10 +541,8 @@ func _register_console() -> void:
 		DotSecurityCommands.register(self, server.console)
 		return
 
-	# Registered the moment the console exists. state_changed fires on the way
-	# through BOOTING, by which point the console has been created and its own
-	# cvars registered — and before server.cfg runs, so an operator can set
-	# sv_security in it like any other setting.
+	# Registered the moment the console exists: state_changed fires through BOOTING after the console's own cvars exist,
+	# and before server.cfg runs, so an operator can set sv_security in it.
 	if not server.state_changed.is_connected(_on_server_state):
 		server.state_changed.connect(_on_server_state)
 
@@ -617,7 +555,6 @@ func _on_server_state(_state: int) -> void:
 	DotSecurityCommands.register(self, server.console)
 
 
-# --- Reporting -------------------------------------------------------------
 
 func describe() -> Dictionary:
 	return {

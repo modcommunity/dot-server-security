@@ -2,12 +2,7 @@ class_name DotBanIndex
 extends RefCounted
 
 ## The merged contents of every ban feed, and the thing a join is checked against.
-##
-## [b]A join is on the hot path and must not be a walk.[/b] Account ids and exact
-## addresses are dictionary lookups; only CIDR ranges are walked, which is why
-## ranges are kept in their own small list rather than expanded into addresses.
-## Expanding a /16 is sixty-five thousand entries for one line of somebody's
-## blocklist.
+## A join is on the hot path: ids and exact addresses are dictionary lookups, and only CIDR ranges are walked, kept in their own list because expanding a /16 is 65,000 entries for one line.
 
 ## uid -> reason
 var uids: Dictionary = {}
@@ -19,11 +14,7 @@ var addresses: Dictionary = {}
 var _ranges: Array = []
 
 ## Raw IPv6 prefixes as [prefix_text, reason]; matched by string prefix.
-##
-## Honest about being cruder than the IPv4 path: full IPv6 arithmetic in
-## GDScript is a lot of code for something almost no blocklist publishes. A
-## prefix match on the normalised text catches the case that does occur, which
-## is a whole /64 or /48 written out.
+## Cruder than the IPv4 path on purpose: full IPv6 arithmetic is a lot of code for what almost no blocklist publishes; a prefix match on the normalised text catches a written-out /64 or /48.
 var _v6_prefixes: Array = []
 
 var feed_count: int = 0
@@ -82,7 +73,6 @@ func _add_range(cidr: String, reason: String) -> void:
 	_ranges.append([packed & mask, mask, bits, reason])
 
 
-# --- Lookups ---------------------------------------------------------------
 
 ## Why this account is refused, or an empty string.
 func reason_for_uid(uid: String) -> String:

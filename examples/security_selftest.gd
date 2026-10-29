@@ -1,17 +1,7 @@
 extends Node
 
-## Boots a guarded server and drives every rule, feed and detector.
-##
-## [b]Nothing here waits on wall-clock time it does not have to.[/b] A rule with
-## a ten-second window would otherwise make the suite take ten seconds per
-## assertion, so the rules built here use short windows and the escalation is
-## driven by reporting events directly — which is also exactly what a game does.
-##
-## [codeblock]
-## godot --headless --path . res://examples/security_selftest.tscn
-## [/codeblock]
-##
-## Exits non-zero if any check fails.
+## Boots a guarded server and drives every rule, feed and detector; exits non-zero if any check fails.
+## Rules use short windows and escalation is driven by reporting events directly (as a game does), so no assertion waits on wall-clock time.
 
 const SELFTEST_ARG := "--selftest"
 
@@ -205,7 +195,6 @@ func _report(event: StringName, subject: String, times: int = 1) -> void:
 		guard.report(DotSecurityEvent.make(event, subject))
 
 
-# --- Attaching -------------------------------------------------------------
 
 func _test_attach() -> void:
 	_section("[attach]")
@@ -220,7 +209,6 @@ func _test_attach() -> void:
 	_done()
 
 
-# --- The sliding window ----------------------------------------------------
 
 func _test_windows() -> void:
 	print("")
@@ -258,7 +246,6 @@ func _test_windows() -> void:
 	_done()
 
 
-# --- Subjects --------------------------------------------------------------
 
 func _test_subjects() -> void:
 	print("")
@@ -287,7 +274,6 @@ func _test_subjects() -> void:
 	_done()
 
 
-# --- Rules -----------------------------------------------------------------
 
 func _test_rules() -> void:
 	print("")
@@ -442,10 +428,8 @@ func _test_dry_run() -> void:
 	print("")
 	_section("[dry run]")
 
-	# Through the cvar, not the config field: the cvar is registered from the
-	# config at boot and beats it afterwards, which is what lets an operator
-	# stop a guard mid-incident without a restart. Setting the field here and
-	# expecting it to win would be asserting the opposite of the design.
+	# Through the cvar, not the config field: the cvar beats the config after boot, which is what lets an operator
+	# stop a guard mid-incident without a restart.
 	_run("sv_security_dryrun 1")
 
 	var rule := _rule(&"t_dry", &"test.dry", 1)
@@ -559,7 +543,6 @@ func _test_policy_json() -> void:
 	_done()
 
 
-# --- Chat ------------------------------------------------------------------
 
 func _test_chat_detection() -> void:
 	print("")
@@ -605,10 +588,7 @@ func _test_chat_detection() -> void:
 
 
 ## The string and integer couplings to addons this one must not name.
-##
-## Every one of these is a value defined in another repository that this addon
-## reproduces because naming the class would make an optional dependency
-## mandatory. A comment cannot fail when the other side changes; this can.
+## Each is a value defined in another repository and reproduced here; a comment cannot fail when the other side changes, this can.
 func _test_couplings() -> void:
 	print("")
 	_section("[couplings to addons we must not name]")
@@ -636,10 +616,8 @@ func _test_couplings() -> void:
 	_check("the warn kind matches",
 		DotSecurityAction.MOD_KIND_WARN == DotPunishment.Kind.WARN)
 
-	# dot-server's refusal wording, which is the only way to tell a permission
-	# refusal from a mistyped command.
-	# A box rather than a local: GDScript lambdas capture locals by VALUE, so
-	# assigning to a captured String inside one changes nothing outside it.
+	# dot-server's refusal wording, the only way to tell a permission refusal from a mistyped command.
+	# A box rather than a local: lambdas capture locals by VALUE, so assigning to a captured String changes nothing outside.
 	var seen: Array = [""]
 	server.console.command_refused.connect(
 		func(_ctx: DotCmdContext, reason: String) -> void: seen[0] = reason,
@@ -656,7 +634,6 @@ func _test_couplings() -> void:
 	_done()
 
 
-# --- External ban lists ----------------------------------------------------
 
 func _test_ban_index() -> void:
 	print("")
@@ -914,7 +891,6 @@ func _test_ban_feed_admission() -> void:
 	_done()
 
 
-# --- Anti-cheat ------------------------------------------------------------
 
 func _test_anticheat() -> void:
 	print("")
@@ -1072,16 +1048,13 @@ func _test_anticheat() -> void:
 	_done()
 
 
-# --- The fallback when dot-moderation is not installed ---------------------
 
 func _test_without_moderation() -> void:
 	print("")
 	_section("[without a moderation store]")
 
-	# The whole promise of the fallback: a deployment with no dot-moderation
-	# still gets a gag that the player feels, it just does not survive them
-	# reconnecting. Refusing to act without it would make this addon
-	# conditional on another optional one.
+	# The promise of the fallback: with no dot-moderation a gag is still felt, it just does not survive a reconnect.
+	# Refusing to act without it would make this addon conditional on another optional one.
 	var session := DotClientSession.new()
 	session.peer_id = 800
 	session.userid = 800
@@ -1137,15 +1110,9 @@ func _test_without_moderation() -> void:
 	_check("and dot-moderation holds the record",
 		mod.call("is_gagged_key", "uid:durable-test"))
 
-	# [b]The guard almost always attaches BEFORE the store exists, and it used to latch
-	# the answer.[/b] A [DotSecurityManager] is placed beside a [DotServer] and attaches as
-	# the server boots; dot-moderation's manager is built by the GAME, in a module
-	# dot-server loads afterwards — so the registry lookup at attach time is null on every
-	# server in this family that has a store at all, and every punishment the guard issued
-	# from then on quietly died with the connection.
-	#
-	# Asserted by taking the cached answer away rather than by re-attaching, because what
-	# broke was the latch and not the lookup.
+	# The guard attaches BEFORE the store exists (the game's module loads after the server boots), and latching that null
+	# made every punishment quietly die with the connection. Asserted by taking the cached answer away rather than
+	# re-attaching, because what broke was the latch and not the lookup.
 	guard.moderation = null
 	_check("the store is found again when it was not there at attach",
 		guard.moderation_store() == mod)
@@ -1156,7 +1123,6 @@ func _test_without_moderation() -> void:
 	_done()
 
 
-# --- The operator's surface ------------------------------------------------
 
 func _test_console() -> void:
 	print("")

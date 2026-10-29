@@ -2,10 +2,7 @@
 extends EditorPlugin
 
 ## Editor entry point for dot-server-security. Registers inspector types only.
-##
-## No autoloads: a project may run a server and a client in one process, and two
-## servers in one editor session, and a singleton would make both impossible. The
-## host places the nodes and points them at a server with a [DotNodeRef].
+## No autoloads: a singleton would rule out a server and a client in one process. The host places the nodes and points them at a server with a [DotNodeRef].
 
 const _ICON := "res://addons/dot_server_security/icon_placeholder.svg"
 

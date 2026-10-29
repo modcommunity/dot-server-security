@@ -6,3 +6,4 @@
 | [anticheat.md](anticheat.md) | impossible against suspicious, the boot audit, re-simulation, envelope thresholds, what cannot be done |
 | [ban-feeds.md](ban-feeds.md) | `DotBanFeeds`: chaining into `dot_ban_source` and staying on top, and the feed rules |
 | [history.md](history.md) | the bugs, and how each looked |
+| [rationale.md](rationale.md) | reasoning that used to sit in code comments: scope, bounded windows, log escaping, the moderation store, console timing |

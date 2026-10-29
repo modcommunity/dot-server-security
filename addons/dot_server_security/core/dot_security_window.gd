@@ -2,36 +2,15 @@ class_name DotSecurityWindow
 extends RefCounted
 
 ## Sliding-window counters, one per subject, with a hard bound on memory.
-##
-## [b]Sliding, not bucketed.[/b] A fixed bucket that resets on a boundary is
-## walked straight through: five messages at 0.9s and five more at 1.1s is ten
-## messages in two seconds, and a bucket sees two counts of five and trips on
-## neither. Every rate limit written that way has been defeated by somebody
-## noticing the boundary, usually by accident.
-##
-## [b]The bounds are a security control, not tidiness.[/b] A structure that grows
-## one entry per event and one bucket per address is a memory-exhaustion target
-## reachable by exactly the traffic this addon exists to watch: send a million
-## messages from a million forged-looking connections and the guard is the thing
-## that falls over. So the entries per subject are capped, the subjects are
-## capped, and the oldest go first. The same reasoning as dot-server-query's
-## refusal to keep a challenge table.
-##
-## Losing the oldest entries under attack is the right failure: a subject at the
-## entry cap is one already well past any sane threshold, so the rule has fired
-## long before anything was dropped.
+## Sliding, not bucketed: a bucket resetting on a boundary is walked through by five messages either side of it.
+## The bounds are a security control: unbounded per-event and per-address structures are a memory-exhaustion target reachable by exactly the traffic watched, so entries and subjects are capped, oldest first. A subject at the cap is far past any threshold, so its rule has long fired.
 
 ## Most timestamps held for one subject.
-##
-## Comfortably above any sane threshold. A rule needing more than this many
-## events in its window has already tripped several hundred events ago.
+## Comfortably above any sane threshold: a rule needing more has already tripped hundreds of events ago.
 const MAX_ENTRIES_PER_SUBJECT := 256
 
 ## Most subjects tracked at once, per window.
-##
-## Reached only under attack or on a very large server; the oldest-seen subject
-## is evicted, which on a busy server is somebody who has not done the watched
-## thing in a long time.
+## Reached only under attack or on a very large server; the oldest-seen subject is evicted.
 const MAX_SUBJECTS := 4096
 
 ## Subjects idle longer than this are swept, in seconds.
@@ -108,9 +87,7 @@ func subject_count() -> int:
 
 
 ## Sums the entries still inside the window, discarding those that are not.
-##
-## Eviction happens here rather than on a timer because this is the only place
-## that has to walk the list anyway.
+## Eviction happens here rather than on a timer because this is the only place that walks the list anyway.
 func _sum(list: Array, now: int) -> float:
 	var cutoff := now - int(window_sec * 1000.0)
 	var total := 0.0

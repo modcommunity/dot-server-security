@@ -2,30 +2,9 @@
 class_name DotSecurityWatch
 extends Node
 
-## Wires the guard to everything on the server worth watching.
-##
-## One node rather than five, because an operator adding a guard wants a guard,
-## not a parts list. Every source is a separate toggle and every source is
-## optional: a server with no dot-chat installed simply has the chat router
-## half do nothing, and the dot-server chat path is watched instead.
-##
-## [b]Nothing here names dot-chat or dot-auth.[/b] Both are optional addons, and
-## a script mentioning a [code]class_name[/code] the project does not have fails
-## to parse and takes every script referencing it down with it — which for a
-## security addon means the guard stops existing rather than stops watching one
-## source. They are reached through [DotRegistry] and their signals connected by
-## name.
-##
-## What each source gives the rule engine:
-##
-## [codeblock]
-## dot-server chat     chat.message chat.duplicate chat.caps chat.link chat.refused
-## dot-chat router     the same, plus chat.command
-## the server          connect.attempt connect.rejected connect.churn
-## RCON                rcon.auth_failed rcon.command
-## the console         command.denied
-## dot-auth            auth.failed auth.rejected
-## [/codeblock]
+## Wires the guard to everything on the server worth watching: one node rather than five, every source an optional toggle.
+## Nothing here names dot-chat or dot-auth (optional; a missing class_name fails to parse and the guard would stop existing); they are reached through [DotRegistry] and their signals connected by name.
+## Sources and the events they give: chat (chat.*), connections (connect.*), RCON (rcon.*), the console (command.denied), dot-auth (auth.*).
 
 const CHANNEL := "security"
 
@@ -108,7 +87,6 @@ func _wire() -> void:
 		_wire_auth()
 
 
-# --- Chat ------------------------------------------------------------------
 
 func _wire_server_chat() -> void:
 	if server.chat == null:
@@ -172,11 +150,7 @@ func _on_router_command(
 
 
 ## Turns one message into every chat event it is an instance of.
-##
-## A message can be several at once — a shouted, repeated link is three — and
-## each is counted separately, because an operator may care about one and not
-## the others. Reporting only the "worst" would make the other two rules
-## unable to fire.
+## A shouted, repeated link is three events, counted separately because an operator may care about one; reporting only the worst would stop the other rules firing.
 func _examine_message(session: DotClientSession, text: String) -> void:
 	if session == null:
 		return
@@ -280,7 +254,6 @@ static func _has_link(text: String, config: DotSecurityConfig) -> bool:
 	return false
 
 
-# --- Connections -----------------------------------------------------------
 
 func _wire_connections() -> void:
 	server.client_state_changed.connect(_on_client_state)
@@ -333,7 +306,6 @@ func _on_client_disconnected(session: DotClientSession, _reason: String) -> void
 		)
 
 
-# --- RCON ------------------------------------------------------------------
 
 func _wire_rcon() -> void:
 	if server.rcon == null:
@@ -356,19 +328,10 @@ func _on_rcon_command(address: String, command: String) -> void:
 	)
 
 
-# --- Commands --------------------------------------------------------------
 
 ## Text dot-server uses for a refusal that was about permission.
-##
-## [b]A string coupling, and the only one available.[/b] `command_executed` fires
-## only after the permission check has passed, so it never sees a denial;
-## `command_refused` sees every refusal and distinguishes them by this prefix
-## alone. Matching it is therefore the only way to tell somebody probing for
-## commands they do not hold from somebody mistyping one.
-##
-## The self-test asserts the prefix against the real dot-server rather than
-## trusting this comment, because a comment does not fail when the wording
-## changes and this would silently stop counting anything.
+## A string coupling, the only one available: `command_executed` fires after the permission check, so only `command_refused` sees a denial, told apart by this prefix. It tells probing from mistyping.
+## The self-test asserts the prefix against the real dot-server, since a comment does not fail when the wording changes.
 const REFUSAL_PERMISSION := "missing permission"
 
 
@@ -410,7 +373,6 @@ func _session_for(peer: int) -> DotClientSession:
 	return server.session_of(peer)
 
 
-# --- Authentication --------------------------------------------------------
 
 func _wire_auth() -> void:
 	var auth := DotRegistry.get_service(&"dot_auth_server")
@@ -424,11 +386,8 @@ func _wire_auth() -> void:
 
 
 func _on_auth_rejected(reason: String, detail: String) -> void:
-	# dot-auth reports why, not who — it has refused to establish an identity,
-	# so there is not one yet. The address is taken from whichever session is
-	# still mid-handshake, and when none is, the event is dropped rather than
-	# attributed to nobody: a rule counting "somebody, somewhere failed" would
-	# ban the next person to connect.
+	# dot-auth reports why, not who. The address is taken from a session still mid-handshake; when none is, the event is dropped,
+	# since one attributed to nobody ("somebody, somewhere failed") would ban the next person to connect.
 	for session in server.sessions():
 		if session.state == DotClientSession.State.AUTHENTICATING:
 			guard.report_address(

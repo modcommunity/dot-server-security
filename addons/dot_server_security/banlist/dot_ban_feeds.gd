@@ -2,27 +2,8 @@
 class_name DotBanFeeds
 extends Node
 
-## Fetches external ban lists, merges them, and refuses the people on them.
-##
-## Registers as [code]dot_ban_source[/code], which is the seam dot-server already
-## asks on every admission — so nothing in dot-server changes and no addon
-## imports another.
-##
-## [b]It chains rather than replaces.[/b] dot-moderation registers under the same
-## name, and whichever node readies second would otherwise silently win, leaving
-## a deployment with both installed enforcing exactly one of them. Whatever was
-## registered before is kept and asked as well, and both answers have to be
-## "admit" for a player to get in. An operator with dot-moderation and two
-## partner feeds gets all three, which is what they thought they were getting.
-##
-## [codeblock]
-## var feeds := DotBanFeeds.new()
-## feeds.feeds = [
-##     DotBanFeed.of(&"network", "https://bans.example.org/v1/active"),
-##     DotBanFeed.of(&"partner", "https://partner.example/blocklist.json"),
-## ]
-## server.add_child(feeds)
-## [/codeblock]
+## Fetches external ban lists, merges them, and refuses the people on them. Registers as [code]dot_ban_source[/code], the seam dot-server already asks on every admission.
+## It chains rather than replaces: dot-moderation registers under the same name, so whichever readies second would silently win. Whatever was registered before is kept and asked too, and both must say "admit".
 
 const CHANNEL := "security"
 const SERVICE := &"dot_security_bans"
@@ -50,16 +31,11 @@ signal list_changed(total: int)
 @export var fetch_on_ready: bool = true
 
 ## Also consult whatever was registered as `dot_ban_source` before this node.
-##
-## Off means this node replaces dot-moderation's enforcement rather than adding
-## to it, which is almost never what anybody wants — see the class note.
+## Off means this node replaces dot-moderation's enforcement instead of adding to it, almost never wanted.
 @export var chain_previous: bool = true
 
 ## Tell an admitted-then-banned player why, using the feed's own reason text.
-##
-## The reason comes from somebody else's list and is shown to the person it is
-## about. Off for a deployment whose upstream writes reasons it would not want
-## quoted.
+## The reason comes from somebody else's list and is shown to the person it is about; turn off if upstream reasons should not be quoted.
 @export var show_upstream_reason: bool = true
 
 var index := DotBanIndex.new()
@@ -104,10 +80,9 @@ func _ready() -> void:
 	DotRegistry.register(SERVICE, self)
 	DotRegistry.register(BAN_SOURCE, self)
 
-	# Kept on top, not merely put there once. A game's module registers dot-moderation
-	# under the same name when it loads -- on every changelevel -- and the registry is
-	# last-wins, so a chain captured only here was displaced by the first level change
-	# and the feeds stopped being asked at all, with nothing logged above DEBUG.
+	# Kept on top, not put there once: a game's module re-registers dot-moderation on every changelevel
+	# and the registry is last-wins, so a chain captured once was displaced and the feeds stopped being asked,
+	# with nothing logged above DEBUG.
 	if chain_previous:
 		var bus := DotRegistry.signals()
 		if not bus.service_registered.is_connected(_on_service_registered):
@@ -153,7 +128,6 @@ func _exit_tree() -> void:
 	DotRegistry.unregister_instance(BAN_SOURCE, self)
 
 
-# --- Keeping the seam ------------------------------------------------------
 
 func _on_service_registered(service: StringName, instance: Object) -> void:
 	if service == BAN_SOURCE and instance != self:
@@ -211,12 +185,9 @@ static func _chain_reaches(start: Object, target: Object) -> bool:
 	return false
 
 
-# --- The seam dot-server asks ----------------------------------------------
 
 ## Whether this person may join. The contract behind `dot_ban_source`.
-##
-## Asked twice per join: once with the address alone before anybody has said who
-## they are, and again with both once they have. Both calls come through here.
+## Asked twice per join: address alone before anybody has said who they are, then both.
 func check_admission(uid: String, address: String) -> DotResult:
 	# Anything still fetching for the first time with REFUSE_ALL set fails
 	# closed, which is the whole point of that setting: a deployment that chose
@@ -257,7 +228,6 @@ func check_admission(uid: String, address: String) -> DotResult:
 	return DotResult.success(true)
 
 
-# --- Fetching --------------------------------------------------------------
 
 ## Fetches one feed now. Safe to call at any time; `sec_bans_refresh` does.
 func fetch(feed: DotBanFeed) -> void:
@@ -338,15 +308,9 @@ func _entries_of(feed: DotBanFeed) -> Array:
 	return _entries[feed.id]
 
 
-# --- Parsing ---------------------------------------------------------------
 
 ## Turns whatever a service answered into entries. Static, so it is testable.
-##
-## [b]Written to accept the shapes services actually use[/b] rather than one this
-## family would have chosen: a bare array of strings, an array of objects, an
-## object wrapping either at some path, and objects whose id field is called any
-## of five things. A blocklist an operator cannot point this at is a blocklist
-## they will copy into a file by hand, and then it is stale.
+## Accepts the shapes services actually use (bare strings, objects, either wrapped at a path, any of five id field names): a list an operator cannot point this at gets copied by hand, then goes stale.
 static func parse_payload(feed: DotBanFeed, payload: Variant) -> DotResult:
 	var list: Variant = payload
 
@@ -461,7 +425,6 @@ static func _entry_from(feed: DotBanFeed, raw: Variant, now: int) -> Dictionary:
 	return out
 
 
-# --- Merging ---------------------------------------------------------------
 
 func _rebuild() -> void:
 	index.clear()
@@ -489,7 +452,6 @@ func _rebuild() -> void:
 	list_changed.emit(index.size())
 
 
-# --- The disk cache --------------------------------------------------------
 
 func _load_cache(feed: DotBanFeed) -> void:
 	if feed.cache_path.strip_edges() == "":
@@ -538,7 +500,6 @@ func _save_cache(feed: DotBanFeed, entries: Array) -> void:
 	DotWeb.sync_filesystem()
 
 
-# --- Scheduling ------------------------------------------------------------
 
 func _schedule(feed: DotBanFeed) -> void:
 	if feed.refresh_sec <= 0.0:
@@ -554,7 +515,6 @@ func _schedule(feed: DotBanFeed) -> void:
 	_timers[feed.id] = timer
 
 
-# --- Configuration ---------------------------------------------------------
 
 func _load_feeds_file() -> void:
 	if feeds_file.strip_edges() == "" or not FileAccess.file_exists(feeds_file):
@@ -603,7 +563,6 @@ func find(id: StringName) -> DotBanFeed:
 	return null
 
 
-# --- Reporting -------------------------------------------------------------
 
 func describe() -> Dictionary:
 	var out := index.describe()

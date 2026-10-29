@@ -2,38 +2,8 @@
 class_name DotAntiCheat
 extends Node
 
-## Server-side detectors, reporting into the same rule engine everything else does.
-##
-## A detection is a [DotSecurityEvent] like any other, so the whole of the rule
-## machinery — sliding windows, thresholds, escalation ladders, exemptions, the
-## ledger, dry run, `sec_why` — applies to cheating without a second copy of any
-## of it. "Three impossible speeds in a minute, then ban" is a rule, not code.
-##
-## [codeblock]
-## var ac := DotAntiCheat.new()
-## ac.config.max_horizontal_speed = 420.0     # measured, not guessed
-## server.add_child(ac)
-##
-## # From the game, once per simulated tick:
-## ac.observe_move(session, position, velocity, on_ground, delta)
-## ac.observe_shot(session, weapon_id, cycle_time_sec)
-## [/codeblock]
-##
-## [b]What this cannot do, stated plainly, because the alternative is an operator
-## believing otherwise.[/b]
-##
-## There is no client-side component here and there will not be one: a Godot
-## game ships its own script code to the player, and anything this addon ran on
-## their machine could be read, patched or replayed by anyone who cared. Memory
-## scanning, driver-level attestation and screenshot capture are the province of
-## a signed native anti-cheat and are not honestly buildable here.
-##
-## So this catches what a server can prove and reports what a server can notice.
-## It will not detect a well-written wallhack — nothing server-side reliably
-## does. [b]The mitigation for that is not detection, it is not sending the
-## data[/b]: interest management, which belongs in the netcode, is the only thing
-## that actually stops it. A player whose client was never told where the enemy
-## is cannot draw a box around them.
+## Server-side detectors, reporting into the same rule engine as everything else: a detection is a [DotSecurityEvent], so windows, ladders, exemptions and dry run apply unchanged.
+## There is no client-side component; wallhacks are stopped by interest management in the netcode, not detection (docs/anticheat.md).
 
 const CHANNEL := "anticheat"
 const SERVICE := &"dot_anticheat"
@@ -58,23 +28,8 @@ signal detected(
 
 @export_group("Reference simulation")
 
-## A callable that re-simulates one tick, for the check that cannot be bypassed.
-##
-## [b]This is the difference between an anti-cheat and a threshold.[/b] Given the
-## command a client sent and the state it started from, a deterministic movement
-## system can say exactly where that client should have ended up; anything else
-## is a claim the server can reject. The envelope settings
-## ([member DotAntiCheatConfig.max_horizontal_speed] and the rest) exist only
-## for a game whose movement cannot be re-run, and they are guesses by
-## comparison — wide enough to miss a careful cheat, narrow enough to catch a
-## legitimate boost pad nobody thought about.
-##
-## Signature: [code]func(session, from_position, from_velocity, command, delta)
-## -> Vector3[/code], returning the position the server believes in.
-##
-## This family's first-person controller is already command-driven and
-## deterministic precisely so a server can reconcile it, so a game using it has
-## the hard half done.
+## A callable that re-simulates one tick: the check a threshold cannot match, since the server can reject any claim that differs from where the command should have led.
+## Signature: [code]func(session, from_position, from_velocity, command, delta) -> Vector3[/code], the position the server believes in.
 @export var movement_reference: Callable = Callable()
 
 var guard: DotSecurityManager = null
@@ -150,11 +105,8 @@ func _exit_tree() -> void:
 	DotRegistry.unregister_instance(SERVICE, self)
 
 
-## Refuses a rule that would act on one behavioural signal.
-##
-## An operator who writes `cheat.aim_snap, threshold 1, ban` has written a rule
-## that will eventually ban a good player, and they will not find out until it
-## does. Named at boot, when it can still be changed.
+## Refuses a rule that would act on one behavioural signal, which eventually bans a good player unnoticed.
+## Named at boot, when it can still be changed.
 func _audit_rules() -> void:
 	if not config.refuse_single_shot_behavioural or guard.policy == null:
 		return
@@ -181,12 +133,9 @@ func _audit_rules() -> void:
 		)
 
 
-# --- What a game reports ---------------------------------------------------
 
 ## One simulated tick of a player's movement.
-##
-## [param command] is whatever the game's controller took as input; it is passed
-## straight back to [member movement_reference] and is otherwise unread.
+## [param command] is the controller's input, passed straight back to [member movement_reference] and otherwise unread.
 func observe_move(
 	session: DotClientSession,
 	position: Vector3,
@@ -266,10 +215,7 @@ func observe_move(
 
 
 ## One command from a client, for the timing check.
-##
-## [param client_delta] is how much simulated time the client claims this command
-## covers. A client claiming more simulated time than has actually elapsed is
-## the shape both a speed hack and a timer cheat take.
+## [param client_delta] is the simulated time the client claims; more than has elapsed is the shape of both a speed hack and a timer cheat.
 func observe_command(
 	session: DotClientSession, client_delta: float, sequence: int = -1
 ) -> void:
@@ -368,10 +314,7 @@ func observe_hit(
 
 
 ## A view-angle change, for the aim detectors. Degrees.
-##
-## [param to_target_degrees] is how far the new aim is from the nearest enemy;
-## pass a large number when there is none. A fast turn onto nothing is a player
-## looking around, and counting it would flag everybody.
+## [param to_target_degrees] is the angle to the nearest enemy; pass a large number when none, since a fast turn onto nothing is just looking around.
 func observe_aim(
 	session: DotClientSession,
 	delta_degrees: float,
@@ -428,14 +371,8 @@ func observe_build(session: DotClientSession, build_hash: String) -> void:
 
 
 ## A detection's detail, made safe to write to a log.
-##
-## [b]Some of it is whatever the client said[/b] — [method observe_build]'s `reported` is
-## the client's own build string, and a weapon id can arrive from a command — and
-## [method DotLog.format_fields] quotes a value but does not escape a newline. So a build
-## string of `x\ninf security   ...` wrote a second, forged record into the log an admin
-## reads to decide who cheated, and a megabyte one wrote a megabyte per detection.
-## Strings are escaped and cut here, on the one path that logs a detail; the numbers the
-## server measured itself pass through unchanged.
+## Client-supplied strings (build string, weapon id) are escaped and cut here: format_fields quotes but does not escape a newline, so one could forge a log record or write a megabyte.
+## Numbers the server measured pass through unchanged.
 static func _loggable(detail: Dictionary) -> Dictionary:
 	var out := {}
 	for key: Variant in detail:
@@ -469,7 +406,6 @@ func _check_headshot_ratio(session: DotClientSession, track: Dictionary) -> void
 	track["headshots"] = 0
 
 
-# --- Plumbing --------------------------------------------------------------
 
 func _running() -> bool:
 	if config == null or not config.enabled:
@@ -491,10 +427,8 @@ func _report(
 	detected.emit(session, kind, impossible, detail)
 
 	if config.dry_run:
-		# Logged and counted, never reported into the rule engine — so no rule
-		# can act on it however it is written. A separate switch from the
-		# guard's own dry run, because an operator commonly trusts chat rules
-		# long before a movement threshold they have not measured.
+		# Logged and counted, never reported into the rule engine, so no rule can act on it.
+		# Separate from the guard's dry run: operators trust chat rules long before an unmeasured movement threshold.
 		DotLog.info(CHANNEL, "would report %s" % kind, _loggable(detail))
 		return
 
@@ -528,7 +462,6 @@ func forget(session: DotClientSession) -> void:
 		_tracks.erase(session.peer_id)
 
 
-# --- Reporting -------------------------------------------------------------
 
 func describe() -> Dictionary:
 	return {

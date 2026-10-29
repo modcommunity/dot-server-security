@@ -2,25 +2,8 @@
 class_name DotBanFeed
 extends Resource
 
-## One external list of people who may not play here.
-##
-## A community with eight servers, a partner network, or a shared blocklist wants
-## one list, fetched rather than copied. This is one endpoint of that: where it
-## is, how to prove you may read it, how to find the identifiers in whatever it
-## answers with, and what to do when it is down.
-##
-## [b]Several feeds are the normal case, not the advanced one.[/b] A network's own
-## list, a partner's, and a public one have different owners, different trust and
-## different refresh rates, and merging them by hand into one file is how they
-## drift. [DotBanFeeds] holds any number.
-##
-## [codeblock]
-## var feed := DotBanFeed.new()
-## feed.id = &"network"
-## feed.url = "https://bans.example.org/v1/active"
-## feed.auth = DotBanFeed.Auth.BEARER
-## feed.token_file = "user://cfg/bans.token"    # not the token itself
-## [/codeblock]
+## One external list of people who may not play here: where it is, how to authenticate, how to find the identifiers in the response, and what to do when it is down.
+## Several feeds are the normal case (different owners, trust and refresh rates); [DotBanFeeds] holds any number.
 
 enum Auth {
 	## A public list. No credential is sent.
@@ -34,28 +17,16 @@ enum Auth {
 	## An arbitrary header, for an API that wants `X-Api-Key` or similar.
 	HEADER = 3,
 	## A query parameter appended to the URL.
-	##
-	## [b]Supported and discouraged.[/b] A credential in a URL is a credential in
-	## every proxy log, every crash report and every browser history between here
-	## and there. It is here because some services offer nothing else.
+	## Supported and discouraged: a credential in a URL lands in every proxy log and crash report. Here because some services offer nothing else.
 	QUERY = 4,
 	## A timestamp, a nonce and an HMAC over both, in headers.
-	##
-	## The shape the backbone's integration requests already use, so a site
-	## verifying both needs one implementation. Nothing replayable is sent, which
-	## is what makes it the right choice over a bearer token on an endpoint whose
-	## traffic somebody else can see.
+	## The shape the backbone's integration requests use; nothing replayable is sent, so prefer it to a bearer token where others can see the traffic.
 	HMAC = 5,
 }
 
 enum OnFailure {
 	## Keep whatever was last fetched, or the disk cache, and carry on.
-	##
-	## [b]The default, and it is a real choice rather than an easy one.[/b] A feed
-	## that is down should not empty the ban list, and it should not close the
-	## server either — an operator whose blocklist provider has an outage would
-	## rather admit a few banned people than nobody at all. A deployment where
-	## that trade goes the other way sets REFUSE_ALL.
+	## The default, deliberately: a down feed must not empty the ban list, nor close the server. A deployment that trades the other way sets REFUSE_ALL.
 	KEEP_LAST = 0,
 	## Treat the list as empty. Admits everybody this feed would have refused.
 	IGNORE = 1,
@@ -75,9 +46,7 @@ enum OnFailure {
 @export var url: String = ""
 
 ## Allow plain HTTP.
-##
-## A ban list over HTTP is a ban list anybody on the path can rewrite, and the
-## interesting rewrite is the empty one — which fails open and silently. Off.
+## A ban list over HTTP can be rewritten by anyone on the path, and the empty rewrite fails open silently. Off.
 @export var allow_insecure: bool = false
 
 ## Seconds between fetches. 0 fetches once at boot and never again.
@@ -91,11 +60,8 @@ enum OnFailure {
 
 @export var auth: Auth = Auth.NONE
 
-## The credential. [b]Refused from the environment and the command line.[/b]
-##
-## Both are readable by other processes on the box and both end up in `ps` output
-## and in pasted bug reports. Use [member token_file], which is the layer this
-## family already treats as safe for a secret.
+## The credential. [b]Refused from the environment and the command line[/b]: both show in `ps` output and pasted bug reports.
+## Use [member token_file], the layer this family treats as safe for a secret.
 @export var token: String = ""
 
 ## A file holding the credential, read at boot. Preferred over [member token].
@@ -113,15 +79,11 @@ enum OnFailure {
 @export_group("Parsing")
 
 ## Where the list lives in the response, as dot-separated keys.
-##
-## Empty treats the whole document as the list. `data.bans` reaches
-## `{"data": {"bans": [...]}}`, which is what most REST APIs actually answer.
+## Empty treats the whole document as the list; `data.bans` reaches `{"data": {"bans": [...]}}`.
 @export var list_path: String = ""
 
 ## Field holding an account id, when entries are objects.
-##
-## Several are tried in order, because no two services agree: the first one
-## present on an entry wins.
+## Several are tried in order, because no two services agree; the first present wins.
 @export var uid_fields: PackedStringArray = PackedStringArray([
 	"uid", "id", "user_id", "player_id", "account"
 ])
@@ -142,10 +104,7 @@ enum OnFailure {
 ])
 
 ## Treat a bare string entry as an address when it looks like one.
-##
-## A list of bare strings is the commonest shape there is and it says nothing
-## about what its entries are. Anything parsing as an address or a CIDR range is
-## taken as one; everything else is an account id.
+## Bare strings say nothing about what they are: an address or CIDR range is taken as one, everything else as an account id.
 @export var guess_bare_strings: bool = true
 
 @export_group("Behaviour")
@@ -153,9 +112,7 @@ enum OnFailure {
 @export var on_failure: OnFailure = OnFailure.KEEP_LAST
 
 ## Cache the last good fetch here, so a restart during an outage still enforces.
-##
-## [b]The setting that makes KEEP_LAST mean anything across a restart.[/b] Without
-## it, a server rebooted while the feed is down comes up with an empty list.
+## Without it, KEEP_LAST means nothing across a restart: a server rebooted while the feed is down comes up with an empty list.
 @export var cache_path: String = ""
 
 ## Refuse a response larger than this, in bytes. 0 is no limit.
@@ -170,7 +127,6 @@ static func of(p_id: StringName, p_url: String) -> DotBanFeed:
 	return feed
 
 
-# --- Requests --------------------------------------------------------------
 
 ## The credential in force: the file if there is one, else the inline value.
 func effective_token() -> String:
@@ -234,7 +190,6 @@ func headers() -> Dictionary:
 	return out
 
 
-# --- Validation ------------------------------------------------------------
 
 func validate() -> DotResult:
 	if String(id).strip_edges() == "":

@@ -1,32 +1,9 @@
 class_name DotAntiCheatEvent
 extends RefCounted
 
-## What the anti-cheat detectors report, and the honest line through the middle
-## of it.
-##
-## [b]Two kinds of signal, and conflating them is the mistake every home-grown
-## anti-cheat makes.[/b]
-##
-## [b]Impossible[/b] — the server re-simulated what the client claimed and the
-## claim does not fit. Moving further in a tick than the movement code can
-## produce, firing faster than the weapon allows, a tick rate that does not match
-## the clock. These are facts about arithmetic, not opinions about a player, and
-## a rule may act on one of them immediately. The predictive anti-cheats that
-## work are built on nothing else: they flag only what is physically impossible,
-## so they cannot be argued with and they do not flag a player for being good or
-## for having a bad connection.
-##
-## [b]Suspicious[/b] — the behaviour is unusual. Aim that snaps, aim that is too
-## smooth, a headshot rate three standard deviations out, firing the instant a
-## target crosses the crosshair. Every one of these is also a description of a
-## very good player on a very good day, so a rule acting on a single instance
-## will eventually ban somebody who did nothing. They are worth counting, worth
-## accumulating, and worth showing to a human.
-##
-## The two are separate event names so an operator can put a ban on one and a
-## report on the other, which is the configuration they actually want.
+## What the anti-cheat detectors report: impossible (the server re-simulated and the claim does not fit; a rule may act at once) versus suspicious (also a very good player's day; count and show a human).
+## Separate event names let an operator ban on one and report on the other (docs/anticheat.md).
 
-# --- Impossible: the server did the arithmetic -----------------------------
 
 ## Moved further than the movement code could produce for that command.
 const SPEED := &"cheat.speed"
@@ -41,9 +18,7 @@ const FLY := &"cheat.fly"
 const NOCLIP := &"cheat.noclip"
 
 ## Commands arriving faster than the client's own tick rate can generate them.
-##
-## A timer cheat and a speed hack both show here, because both come down to
-## claiming more simulation than wall-clock time allows.
+## A timer cheat and a speed hack both show here: both claim more simulation than wall-clock allows.
 const TIMING := &"cheat.timing"
 
 ## Fired faster than the weapon's own cycle time.
@@ -58,7 +33,6 @@ const INTEGRITY := &"cheat.integrity"
 ## A command number repeated, skipped or reordered beyond what loss explains.
 const COMMAND_SEQUENCE := &"cheat.command_sequence"
 
-# --- Suspicious: a human should look ---------------------------------------
 
 ## View angle changed faster than a hand moves, and landed on a target.
 const AIM_SNAP := &"cheat.aim_snap"
@@ -107,9 +81,6 @@ static func is_suspicious(name: StringName) -> bool:
 
 
 ## Whether a rule acting on one instance of this event can be defended.
-##
-## Used by [DotAntiCheatConfig] to refuse a configuration that would ban on a
-## single behavioural signal — which is how an anti-cheat bans a good player and
-## loses a community.
+## [DotAntiCheatConfig] uses it to refuse a configuration that would ban on a single behavioural signal.
 static func may_act_on_one(name: StringName) -> bool:
 	return is_impossible(name)

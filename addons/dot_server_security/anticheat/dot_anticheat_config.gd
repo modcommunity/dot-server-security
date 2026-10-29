@@ -3,13 +3,7 @@ class_name DotAntiCheatConfig
 extends DotSecurityConfigBase
 
 ## Every threshold the detectors use, and the two that are not thresholds.
-##
-## [b]Almost all of this is per-game and none of the defaults are right for
-## yours.[/b] A surf server's legitimate speed is a speed hack on a lobby; a
-## game with a grapple teleports players on purpose. The defaults are wide
-## enough to catch only the obvious, and an operator is expected to narrow them
-## against `sec_ac_status`, which reports the largest value each detector has
-## actually seen.
+## No default is right for every game (a surf server's speed is a lobby's speed hack); narrow them against `sec_ac_status`, which reports the largest value each detector has seen.
 
 @export_group("Master")
 
@@ -22,12 +16,7 @@ extends DotSecurityConfigBase
 @export var dry_run: bool = true
 
 ## Refuse a rule that would act on a single behavioural signal.
-##
-## [b]On, and worth leaving on.[/b] Aim analysis describes a very good player as
-## readily as a cheat, so a rule that bans on one instance will eventually ban
-## somebody who did nothing — and the community remembers that far longer than
-## it remembers the cheat. A behavioural rule needs a threshold above one, or
-## this refuses it at boot and says why.
+## On, and worth leaving on: aim analysis describes a very good player as readily as a cheat, so such a rule eventually bans someone innocent. A behavioural rule needs a threshold above one, or this refuses it at boot.
 @export var refuse_single_shot_behavioural: bool = true
 
 @export_group("Movement")
@@ -35,12 +24,7 @@ extends DotSecurityConfigBase
 @export var watch_movement: bool = true
 
 ## Metres per second above which horizontal movement is impossible.
-##
-## [b]0 disables the check, and 0 is the right value until you have measured
-## yours.[/b] It must be above anything the movement code can produce — a
-## surf ramp, a boost pad, a grapple, a vehicle, knockback — and the honest way
-## to set it is to run with it at 0 for a week and read the peak off
-## `sec_ac_status`.
+## 0 disables the check and is right until measured: it must exceed anything the movement code can produce (ramp, boost pad, grapple, vehicle, knockback). Run at 0 for a week and read the peak off `sec_ac_status`.
 @export_range(0.0, 10000.0, 1.0) var max_horizontal_speed: float = 0.0
 
 ## Metres per second of rise above which upward movement is impossible.
@@ -50,17 +34,11 @@ extends DotSecurityConfigBase
 @export_range(0.0, 100000.0, 1.0) var max_tick_distance: float = 0.0
 
 ## Seconds off the ground above which a player is flying.
-##
-## Every game with a jump pad, a ladder, a glider or low gravity needs this
-## raised or off.
+## Any game with a jump pad, ladder, glider or low gravity needs this raised or off.
 @export_range(0.0, 600.0, 0.5) var max_airborne_sec: float = 0.0
 
 ## Fraction of the predicted position a re-simulation may differ by.
-##
-## Only used when a reference simulator is supplied — see
-## [member DotAntiCheatDetectors.movement_reference]. This is the check that is
-## actually unbypassable, and everything above is the envelope fallback for a
-## game that cannot supply one.
+## Only used with a reference simulator ([member DotAntiCheatDetectors.movement_reference]), the check that cannot be bypassed; the envelope settings are the fallback.
 @export_range(0.0, 100.0, 0.01) var reference_tolerance_m: float = 0.25
 
 @export_group("Timing")
@@ -68,9 +46,7 @@ extends DotSecurityConfigBase
 @export var watch_timing: bool = true
 
 ## How much faster than wall-clock a client's commands may arrive, as a ratio.
-##
-## 1.05 allows five per cent, which covers scheduling jitter and a burst after a
-## stall. A timer cheat is usually 1.2 or more, so this is not a fine judgement.
+## 1.05 covers scheduling jitter and a burst after a stall; a timer cheat is usually 1.2 or more.
 @export_range(1.0, 3.0, 0.01) var max_time_ratio: float = 1.05
 
 ## Seconds of history the ratio is measured over. Short windows are all jitter.
@@ -81,9 +57,7 @@ extends DotSecurityConfigBase
 @export var watch_fire_rate: bool = true
 
 ## Fraction of a weapon's stated cycle time that counts as too fast.
-##
-## 0.9 allows ten per cent for rounding and for a tick landing early. Below
-## that, the client claimed to fire faster than its own weapon allows.
+## 0.9 allows ten per cent for rounding and a tick landing early.
 @export_range(0.1, 1.0, 0.01) var fire_interval_tolerance: float = 0.9
 
 ## Metres of slack added to a weapon's range before a hit counts as out of reach.
@@ -99,23 +73,15 @@ extends DotSecurityConfigBase
 @export_range(0.0, 360.0, 1.0) var snap_degrees: float = 60.0
 
 ## A snap only counts when it ends within this many degrees of a target.
-##
-## [b]The half that makes the check mean anything.[/b] Players spin constantly —
-## to check behind them, to reposition, out of boredom. A fast turn that lands
-## on nothing is a player; one that lands on a head is worth counting.
+## Players spin constantly: a fast turn onto nothing is a player, one onto a head is worth counting.
 @export_range(0.0, 90.0, 0.5) var snap_on_target_degrees: float = 3.0
 
-## Milliseconds between crosshair-on-target and firing, below which it is called
-## a triggerbot.
-##
-## Human reaction to a visual cue does not go below about 100ms, and 80 leaves
-## room for somebody already pulling the trigger.
+## Milliseconds between crosshair-on-target and firing, below which it is called a triggerbot.
+## Human reaction does not go below about 100ms; 80 leaves room for someone already pulling the trigger.
 @export_range(0.0, 1000.0, 5.0) var trigger_reaction_ms: float = 80.0
 
 ## Shots before the headshot ratio is judged at all.
-##
-## Small samples produce nonsense: three headshots out of three is a coincidence
-## that happens on every server every hour.
+## Small samples produce nonsense: three headshots of three happens on every server every hour.
 @export_range(10, 10000, 10) var headshot_min_shots: int = 100
 
 ## Headshot fraction above which the ratio is reported.
@@ -126,11 +92,7 @@ extends DotSecurityConfigBase
 @export var watch_integrity: bool = true
 
 ## Hashes a client may report. Empty accepts anything.
-##
-## [b]Worth having and worth not over-trusting.[/b] A client that lies about its
-## build is caught; a client patched to report the right hash is not. It raises
-## the cost of the laziest cheat and nothing more, which is still worth the
-## fifteen lines.
+## Raises the cost of the laziest cheat and nothing more: a client patched to report the right hash is not caught.
 @export var accepted_build_hashes: PackedStringArray = PackedStringArray()
 
 
