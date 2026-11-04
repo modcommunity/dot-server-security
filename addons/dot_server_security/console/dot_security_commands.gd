@@ -14,6 +14,7 @@ static func register(guard: DotSecurityManager, console: DotConsole) -> void:
 	_register_status(guard, console)
 	_register_rules(guard, console)
 	_register_subjects(guard, console)
+	_register_test(guard, console)
 	_register_bans(guard, console)
 	_register_anticheat(guard, console)
 
@@ -329,6 +330,9 @@ static func _register_subjects(guard: DotSecurityManager, console: DotConsole) -
 		DotAdminFlags.GENERIC
 	)
 
+
+
+static func _register_test(guard: DotSecurityManager, console: DotConsole) -> void:
 	console.command(
 		"sec_test",
 		func(ctx: DotCmdContext) -> void:

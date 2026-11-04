@@ -103,6 +103,30 @@ func attach() -> DotResult:
 			DotError.CODE_INVALID, "server_ref did not resolve to a DotServer."
 		)
 
+	var configured := _load_config_and_policy()
+	if not configured.ok:
+		return configured
+
+	_reindex()
+
+	if config.dump_rules_file != "":
+		policy.save_json_file(config.dump_rules_file)
+
+	ledger = DotSecurityLedger.new(config.ledger_size)
+
+	moderation = DotRegistry.get_service(&"dot_moderation")
+
+	DotRegistry.register(SERVICE, self)
+	_register_console()
+	_attached = true
+
+	_log_guarding()
+
+	return DotResult.success(self)
+
+
+## Layers the config file, environment and command line, then the rules file over the shipped defaults.
+func _load_config_and_policy() -> DotResult:
 	if config == null:
 		config = DotSecurityConfig.new()
 
@@ -137,19 +161,10 @@ func attach() -> DotResult:
 		)
 		policy = DotSecurityPolicy.defaults()
 
-	_reindex()
+	return DotResult.success(self)
 
-	if config.dump_rules_file != "":
-		policy.save_json_file(config.dump_rules_file)
 
-	ledger = DotSecurityLedger.new(config.ledger_size)
-
-	moderation = DotRegistry.get_service(&"dot_moderation")
-
-	DotRegistry.register(SERVICE, self)
-	_register_console()
-	_attached = true
-
+func _log_guarding() -> void:
 	DotLog.info(
 		CHANNEL,
 		"guarding",
@@ -169,8 +184,6 @@ func attach() -> DotResult:
 			"no moderation store yet: until one registers, punishments last only as "
 			+ "long as the connection. sec_status says what is in force now"
 		)
-
-	return DotResult.success(self)
 
 
 ## The durable punishment store, looked up again if it was not there at [method attach].
