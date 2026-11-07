@@ -32,7 +32,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 
 ## Running and testing
 
-- The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/security_selftest.tscn` (non-zero on failure).
+- The family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/security_selftest.tscn` (non-zero on failure).
 - The suite runs against the real dot-moderation, dot-chat and dot-auth; never replace them with mocks. [rules](docs/rules.md#the-couplings-and-why-they-are-tested-rather-than-commented)
 - dot-server-deploy builds this for every server it runs (`TmcHost._build_security()`, `cfg/security.yml`); a change to the console surface should still pass its `./server check`. [history](docs/history.md#the-guard-was-linked-and-never-built)
 
